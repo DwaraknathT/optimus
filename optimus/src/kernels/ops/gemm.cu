@@ -10,7 +10,7 @@ namespace optimus {
         // c[i] = a[i] + b[i] 
         template<typename T> 
         __global__ void element_wise_add_kernel(T* a, T* b, T* c) {
-
+            
         }
 
         // Element wise addition of 2 tensors. 
