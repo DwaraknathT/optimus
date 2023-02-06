@@ -106,6 +106,7 @@ link_directories(
 
 add_subdirectory(optimus)
 
-add_executable(test test.cpp)
+add_executable(test test.cu)
 target_link_libraries(test PUBLIC gemm_kernels)
+target_link_libraries(test PUBLIC memanager)
 target_link_libraries(test PUBLIC -lcublas -lcublasLt -lcudart -lcurand)
