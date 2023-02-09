@@ -16,6 +16,8 @@ list(APPEND CMAKE_MODULE_PATH ${CUDA_PATH}/lib64)
 
 # profiling
 option(USE_NVTX "Whether or not to use nvtx" OFF)
+option(BUILD_PYBIND "Build projects about pybind11" ON)
+
 if(USE_NVTX)
   message(STATUS "NVTX is enabled.")
   add_definitions("-DUSE_NVTX")
@@ -84,6 +86,25 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+set(Python3_FIND_VIRTUALENV "STANDARD")
+find_package(Python3 COMPONENTS Interpreter Development)
+
+# if(BUILD_PYBIND)
+    # # -fPIC is required by pybind11
+    # # https://pybind11.readthedocs.io/en/stable/basics.html#creating-bindings-for-a-simple-function
+    # set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fPIC")
+    # execute_process(COMMAND ${PYTHON_PATH} "-c" "from __future__ import print_function; import os; import pybind11; print(os.path.dirname(pybind11.__file__),end='');"
+    #                 RESULT_VARIABLE _PYTHON_SUCCESS
+    #                 OUTPUT_VARIABLE PYBIND_DIR)
+    # if (NOT _PYTHON_SUCCESS MATCHES 0)
+    #     message(FATAL_ERROR "Pybind config Error.")
+    # endif()
+    # list(APPEND CMAKE_PREFIX_PATH ${PYBIND_DIR})
+    # find_package(pybind11 REQUIRED)
+    # message(STATUS "Found pybind11 v${pybind11_VERSION}: ${pybind11_INCLUDE_DIRS}")
+    # make sure to find python from conda, if a conda virtual env is activated
+# endif()
+
 set(COMMON_HEADER_DIRS
   ${PROJECT_SOURCE_DIR}
   ${CUDA_PATH}/include
@@ -107,6 +128,5 @@ link_directories(
 add_subdirectory(optimus)
 
 add_executable(test test.cu)
-target_link_libraries(test PUBLIC gemm_kernels)
-target_link_libraries(test PUBLIC memanager)
+target_link_libraries(test PUBLIC memanager gemm_kernels)
 target_link_libraries(test PUBLIC -lcublas -lcublasLt -lcudart -lcurand)
