@@ -14,21 +14,14 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     bc git-lfs build-essential gcc wget libssl-dev software-properties-common && \
     add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get install -y python3.11 python3-pip && \
+    apt-get install -y python3.11 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Install cmake.
-# RUN wget https://github.com/Kitware/CMake/releases/download/v3.25.1/cmake-3.25.1.tar.gz && \
-#     tar -zxvf cmake-3.25.1.tar.gz && \
-#     cd cmake-3.25.1 && ./bootstrap && make && make install
-RUN wget https://github.com/Kitware/CMake/releases/download/v3.25.1/cmake-3.25.1-Linux-x86_64.sh \
-      -q -O /tmp/cmake-install.sh \
-      && chmod u+x /tmp/cmake-install.sh \
-      && mkdir /usr/bin/cmake \
-      && /tmp/cmake-install.sh --skip-license --prefix=/usr/bin/cmake \
-      && rm /tmp/cmake-install.sh
+RUN wget https://github.com/Kitware/CMake/releases/download/v3.20.0/cmake-3.20.0.tar.gz && \
+    tar -zxvf cmake-3.20.0.tar.gz && \
+    cd cmake-3.20.0 && ./bootstrap && make && make install
 
-ENV PATH="/usr/bin/cmake/bin:${PATH}"
-
-WORKDIR /workspace/host/optimus
+WORKDIR /workspace/optimus
+ADD . /workspace/optimus

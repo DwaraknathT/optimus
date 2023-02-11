@@ -1,18 +1,18 @@
+/*
+Python bindings for all the math ops kernels defined in ops namespace.
+*/ 
+#include <sys/time.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
 
-#define STRINGIFY(x) #x
-#define MACRO_STRINGIFY(x) STRINGIFY(x)
+#include "optimus/kernels/ops/gemm.h"
 
-int add(int i, int j) {
-    return i + j;
+namespace opt = optimus; 
+
+void pybind_test_wrapper(int a, int b) {
+    opt::ops::pybind_test(a, b);
 }
 
-namespace py = pybind11;
-
-PYBIND11_MODULE(cmake_example, m) {
-    m.def("add", &add, R"pbdoc(
-        Add two numbers
-
-        Some other explanation about the add function.
-    )pbdoc");
+PYBIND11_MODULE(optimus, m) {
+    m.def("add", &pybind_test_wrapper);
 }
