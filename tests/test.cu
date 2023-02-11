@@ -33,8 +33,5 @@ int main() {
         }
     }
     optimus::ops::InvokeGeMM<float>(h_a, h_b, h_c, m, n, k, alpha, beta);
-
-    optimus::ops::pybind_test(1, 2);
-
     return 0;
 }

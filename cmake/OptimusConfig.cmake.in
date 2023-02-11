@@ -1,0 +1,13 @@
+include(CMakeFindDependencyMacro)
+
+get_filename_component(
+  OPTIMUS_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH
+)
+
+list(APPEND CMAKE_MODULE_PATH ${OPTIMUS_CMAKE_DIR})
+
+if(NOT TARGET optimus-shared)
+  include("${OPTIMUS_CMAKE_DIR}/OptimusTargets.cmake")
+endif()
+
+set(OPTIMUS_LIBRARIES optimus-shared)

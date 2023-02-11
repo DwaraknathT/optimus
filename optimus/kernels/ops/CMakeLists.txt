@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.15)
 
 add_library(gemm_kernels SHARED gemm.cu)
 set_property(TARGET gemm_kernels PROPERTY POSITION_INDEPENDENT_CODE  ON)

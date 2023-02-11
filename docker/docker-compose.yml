@@ -1,8 +1,0 @@
-version: '3.4'
-
-services:
-  optimus:
-    image: optimus:dev
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
