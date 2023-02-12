@@ -9,6 +9,7 @@ goals.
 */ 
 #pragma once 
 
+#include <iostream>
 #include <string>
 #include <tuple> 
 #include <unordered_map>
@@ -56,6 +57,8 @@ class MemManager {
                 auto mem_type = std::get<2>(pointer_mapping_->begin()->second);
                 // Call the custom free function.
                 deallocate((void**)(address), mem_type, ptr_name);
+                // Pop the deallovated ptr from map. 
+                pointer_mapping_->erase(ptr_name);
             }
             delete pointer_mapping_; 
         }    

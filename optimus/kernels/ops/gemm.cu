@@ -31,10 +31,6 @@ global y = blockIdx.y
 To check if we can multiply A and B, the number of rows 
 of A must match the number of columns of B. 
 */
-void pybind_test(int a, int b) {
-    printf("Inside pybind");
-}
-
 template <typename T>
 void InvokeGeMM(T* A,
                 T* B, 

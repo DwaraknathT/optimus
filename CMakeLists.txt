@@ -2,9 +2,10 @@ cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
 
 project(optimus VERSION 0.1 LANGUAGES CXX CUDA)
 
-###########################################################
 find_package(CUDA  REQUIRED)
 include_directories("${CUDA_INCLUDE_DIRS}")
+
+###########################################################
 
 set(CXX_STD "17" CACHE STRING "C++ standard")
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})
@@ -99,12 +100,15 @@ link_directories(
 )
 
 add_subdirectory(optimus)
+add_subdirectory(examples)
 
 ###########################################################
 
 add_library(optimus SHARED 
-    $<TARGET_OBJECTS:gemm_kernels>
     $<TARGET_OBJECTS:memanager>
+    $<TARGET_OBJECTS:log_utils>
+    $<TARGET_OBJECTS:gemm_kernels>
+    $<TARGET_OBJECTS:arithmetic_kernels>
 )
 set_property(TARGET optimus PROPERTY POSITION_INDEPENDENT_CODE ON)
 set_property(TARGET optimus PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)

@@ -79,10 +79,14 @@ void optimus::MemManager::deallocate(void** ptr,
         free(ptr);
     }
     else if (mem_type == memorytype::MEMORY_CPU_PINNED) {
-        checkCuda(cudaFreeHost(ptr));
+        cudaError_t status = cudaFreeHost(ptr);
+        if (status != cudaSuccess)
+            printf("Error freeing GPU memory\n");
     }
     else if (mem_type == memorytype::MEMORY_GPU) {
-        checkCuda(cudaFree(ptr));
+        cudaError_t status = cudaFree(ptr);
+        if (status != cudaSuccess)
+            printf("Error freeing GPU memory\n");
     }
 }
 

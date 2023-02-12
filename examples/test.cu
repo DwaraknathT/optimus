@@ -15,9 +15,9 @@ int main() {
     const float beta = 0; 
 
     auto memory_manager = new optimus::MemManager();
-    float* h_a = (float*)(memory_manager->allocate(size_a, optimus::MEMORY_CPU)); 
-    float* h_b = (float*)(memory_manager->allocate(size_b, optimus::MEMORY_CPU)); 
-    float* h_c = (float*)(memory_manager->allocate(size_c, optimus::MEMORY_CPU));
+    float* h_a = (float*)(memory_manager->allocate(size_a, optimus::MEMORY_CPU_PINNED)); 
+    float* h_b = (float*)(memory_manager->allocate(size_b, optimus::MEMORY_CPU_PINNED)); 
+    float* h_c = (float*)(memory_manager->allocate(size_c, optimus::MEMORY_CPU_PINNED));
 
     // random initialize matrix A
     for (int i = 0; i < m; ++i) {
@@ -32,9 +32,9 @@ int main() {
             h_b[i * k + j] = (float)((i * n + j) % 1024);
         }
     }
-    optimus::ops::InvokeGeMM<float>(h_a, h_b, h_c, m, n, k, alpha, beta);
 
-    optimus::ops::pybind_test(1, 2);
+    delete memory_manager;
+    // optimus::ops::InvokeGeMM<float>(h_a, h_b, h_c, m, n, k, alpha, beta);
 
     return 0;
 }
