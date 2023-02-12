@@ -1,18 +1,14 @@
-/*
-Python bindings for all the math ops kernels defined in ops namespace.
-*/ 
-#include <sys/time.h>
 #include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>
-
 #include "optimus/kernels/ops/gemm.h"
 
-namespace opt = optimus; 
+namespace py = pybind11;
+namespace opt = optimus;
 
-void pybind_test_wrapper(int a, int b) {
+void invokeGeMM(int a, int b) {
     opt::ops::pybind_test(a, b);
 }
 
-PYBIND11_MODULE(optimus, m) {
-    m.def("add", &pybind_test_wrapper);
+PYBIND11_MODULE(pyoptimus, m) {
+    m.doc() = "pybind11 example plugin"; // optional module docstring
+    m.def("matmul", &invokeGeMM, "A function that adds two numbers");
 }
