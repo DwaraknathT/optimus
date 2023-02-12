@@ -5,4 +5,4 @@ services:
     image: optimus:dev
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile
