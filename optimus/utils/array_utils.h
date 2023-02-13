@@ -19,8 +19,10 @@ to the following.
     * If in any dim the sizes aren't equal and none is 1, then throw an error. 
 
 */ 
-void checkBroadcastRules(std::tuple<int> shape_a, std::tuple<int> shape_b) {
-    
+
+inline int div_ceil(int numerator, int denominator) {
+    std::div_t res = std::div(numerator, denominator);
+    return res.rem ? (res.quot + 1) : res.quot;
 }
 
 } // namespace optimus 

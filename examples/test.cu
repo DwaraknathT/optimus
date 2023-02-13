@@ -32,9 +32,8 @@ int main() {
             h_b[i * k + j] = (float)((i * n + j) % 1024);
         }
     }
-
+    optimus::ops::InvokeGeMM<float>(h_a, h_b, h_c, m, n, k, alpha, beta);
     delete memory_manager;
-    // optimus::ops::InvokeGeMM<float>(h_a, h_b, h_c, m, n, k, alpha, beta);
 
     return 0;
 }
