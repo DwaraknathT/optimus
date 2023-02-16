@@ -5,9 +5,9 @@
 using namespace optimus;
 
 int main() {
-    const uint32_t m = 70;
-    const uint32_t n = 128;
-    const uint32_t k = 256; 
+    const uint32_t m = 4096;
+    const uint32_t n = 4096;
+    const uint32_t k = 4096; 
     const size_t size_a = sizeof(float) * m * n;
     const size_t size_b = sizeof(float) * n * k; 
     const size_t size_c = sizeof(float) * m * k; 
@@ -20,15 +20,15 @@ int main() {
     float* h_c = (float*)(memory_manager->allocate(size_c, optimus::MEMORY_CPU_PINNED));
 
     // random initialize matrix A
-    for (int i = 0; i < m; ++i) {
-        for (int j = 0; j < n; ++j) {
+    for (uint32_t i = 0; i < m; ++i) {
+        for (uint32_t j = 0; j < n; ++j) {
             h_a[i * n + j] = (float)((i * n + j) % 1024);
         }
     }
 
     // random initialize matrix B
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < k; ++j) {
+    for (uint32_t i = 0; i < n; ++i) {
+        for (uint32_t j = 0; j < k; ++j) {
             h_b[i * k + j] = (float)((i * n + j) % 1024);
         }
     }

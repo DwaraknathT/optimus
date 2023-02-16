@@ -1,7 +1,7 @@
-// General Matrix Multiplication Kernel in CUDA C++ 
 #include <iostream>
 #include <cmath>
 #include "optimus/kernels/ops/gemm.h"
+#include "optimus/utils/array_utils.h"
 
 namespace optimus {
 // A nested namespace for all the core math ops 
@@ -16,7 +16,6 @@ A = (M x N), B = (N x K). Then result C = (M x K).
 c[i][j] = sum (A[i][k] * B[k][i] for k in range (0 to N))
 In naive implementation, each thread operates on one element 
 of C. Each block can have a max of 1024 threads. 
-
 */
 template<typename T> 
 __global__ void naiveGeMMKernel(T* A, T* B, T* C, 
@@ -57,8 +56,7 @@ void InvokeGeMM(T* A,
     // Naive Implementation - each thread in the kernels operates on one 
     // element in the result matrix. Each block can have 1024 threads, so 
     // threadDim is (32, 32) and Block dim is (M / 32, k / 32).
-
-    dim3 gridDim(div_ceil(M, 32), div_ceil(K, 32), 1);
+    dim3 gridDim(div_ceil(K, 32), div_ceil(M, 32), 1);
     dim3 blockDim(32, 32, 1); 
     // Launch the kernel 
     naiveGeMMKernel<T><<<gridDim, blockDim>>>(A, B, C, M, N, K, alpha, beta);

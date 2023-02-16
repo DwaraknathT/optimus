@@ -29,7 +29,6 @@ void invokeMatMulwrapper(py::array_t<T> a, py::array_t<T> b, py::array_t<T> c) {
     cudaMallocHost(&d_a, a.nbytes());
     cudaMallocHost(&d_b, b.nbytes());
     // Result array is of shape M x K if A = M x N, B = N x K. 
-    const size_t result_size = sizeof(T) * M * K;
     cudaMallocHost(&d_c, c.nbytes());
 
     cudaMemcpy((void*)d_a, (void*)a.data(), a.nbytes(), cudaMemcpyHostToDevice);
