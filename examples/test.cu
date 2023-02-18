@@ -15,9 +15,9 @@ int main() {
     const float beta = 0; 
 
     auto memory_manager = new optimus::MemManager();
-    float* h_a = (float*)(memory_manager->allocate(size_a, optimus::MEMORY_CPU_PINNED)); 
-    float* h_b = (float*)(memory_manager->allocate(size_b, optimus::MEMORY_CPU_PINNED)); 
-    float* h_c = (float*)(memory_manager->allocate(size_c, optimus::MEMORY_CPU_PINNED));
+    float* h_a = (float*)(memory_manager->allocate(size_a, optimus::MEMORY_CPU)); 
+    float* h_b = (float*)(memory_manager->allocate(size_b, optimus::MEMORY_CPU)); 
+    float* h_c = (float*)(memory_manager->allocate(size_c, optimus::MEMORY_CPU));
 
     // random initialize matrix A
     for (uint32_t i = 0; i < m; ++i) {
@@ -32,7 +32,17 @@ int main() {
             h_b[i * k + j] = (float)((i * n + j) % 1024);
         }
     }
-    optimus::ops::InvokeGeMM<float>(h_a, h_b, h_c, m, n, k, alpha, beta);
+
+    float* d_a = (float*)(memory_manager->allocate(size_a, optimus::MEMORY_GPU)); 
+    float* d_b = (float*)(memory_manager->allocate(size_b, optimus::MEMORY_GPU)); 
+    float* d_c = (float*)(memory_manager->allocate(size_c, optimus::MEMORY_GPU));
+
+    cudaMemcpy(d_a, h_a, size_a, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, h_b, size_b, cudaMemcpyHostToDevice);
+    
+
+    optimus::ops::InvokeGeMM<float>(d_a, d_b, d_c, m, n, k, alpha, beta);
+    cudaMemcpy(d_c, h_c, size_c, cudaMemcpyDeviceToHost);
     delete memory_manager;
 
     return 0;
