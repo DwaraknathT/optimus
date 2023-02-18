@@ -112,7 +112,7 @@ add_library(optimus SHARED
 )
 set_property(TARGET optimus PROPERTY POSITION_INDEPENDENT_CODE ON)
 set_property(TARGET optimus PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-target_link_libraries(optimus PUBLIC -lcudart -lnccl -lcublas -lcublasLt -lcurand)
+target_link_libraries(optimus PUBLIC -lcudart -lcublas -lcublasLt -lcurand)
 
 include(GNUInstallDirs)
 set(INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/FasterTransformer)
