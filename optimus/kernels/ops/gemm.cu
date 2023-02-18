@@ -7,6 +7,8 @@ namespace optimus {
 // A nested namespace for all the core math ops 
 namespace ops {
 
+#define CEIL_DIV(M, N) ((M) + (N)-1) / (N)
+
 /*
 Simple general matrix multiplication kernel. 
 C = alpha * (A * B) + beta * C 
@@ -14,26 +16,55 @@ Let's say we are multiplying 2 matrices A and B.
 A = (M x N), B = (N x K). Then result C = (M x K). 
 
 c[i][j] = sum (A[i][k] * B[k][i] for k in range (0 to N))
-In naive implementation, each thread operates on one element 
-of C. Each block can have a max of 1024 threads. 
 */
-template<typename T> 
-__global__ void naiveGeMMKernel(T* A, T* B, T* C, 
-                                const uint32_t M, 
-                                const uint32_t N, 
-                                const uint32_t K, 
-                                const float alpha, 
-                                const float beta) {
+template<typename T, const int chunk_size> 
+__global__ void GeMMKernel(T* A, T* B, T* C, 
+                            const uint32_t M, 
+                            const uint32_t N, 
+                            const uint32_t K, 
+                            const float alpha, 
+                            const float beta) {
     // Each thread operates on a single element in the result matrix. 
-    // id = no of blocks * dim of blocks + thread idx in block. 
-    const uint32_t row = blockIdx.x * blockDim.x + threadIdx.x; 
-    const uint32_t col = blockIdx.y * blockDim.y + threadIdx.y; 
+    const int thread_row = threadIdx.x / chunk_size; 
+    const int thread_col = threadIdx.x % chunk_size; 
+
+    const uint32_t row = blockIdx.x * chunk_size + thread_row; 
+    const uint32_t col = blockIdx.y * chunk_size + thread_col; 
+
+    __shared__ T A_chunk[chunk_size][chunk_size];
+    __shared__ T B_chunk[chunk_size][chunk_size];
+
+    T dot_product = 0; 
+    for (int chunk_idx = 0; chunk_idx < CEIL_DIV(N, chunk_size); chunk_idx++) {
+
+        if (row < M && (chunk_idx * chunk_size + thread_col) < N) {
+            const int A_index = (row * N) + (chunk_idx * chunk_size + thread_col);
+            A_chunk[thread_row][thread_col] = A[A_index];
+        }
+        else {
+            A_chunk[thread_row][thread_col] = 0; 
+        }
+        
+        if ((chunk_idx * chunk_size + thread_row) < N && (col < K)) {
+            const int B_index = (chunk_idx * chunk_size + thread_row) * K + col; 
+            B_chunk[thread_row][thread_col] = B[B_index];
+        }
+        else {
+            B_chunk[thread_row][thread_col] = 0;
+        }
+
+        __syncthreads();
+
+        if (row < M && col < K) {
+            for (int i = 0; i < chunk_size; i++) {
+                dot_product += A_chunk[thread_row][i] * B_chunk[i][thread_col];
+            }
+        }   
+    }
+
+    __syncthreads(); 
 
     if (row < M && col < K) {
-        T dot_product = 0;
-        for (size_t i = 0; i < N; i++) {
-            dot_product += A[row * N + i] * B[i * K + col];
-        }
         C[row * K + col] = dot_product;
     }
 
@@ -56,10 +87,11 @@ void InvokeGeMM(T* A,
     // Naive Implementation - each thread in the kernels operates on one 
     // element in the result matrix. Each block can have 1024 threads, so 
     // threadDim is (32, 32) and Block dim is (M / 32, k / 32).
-    dim3 gridDim(div_ceil(K, 32), div_ceil(M, 32), 1);
-    dim3 blockDim(32, 32, 1); 
+    const int chunk_size = 32; 
+    dim3 gridDim(div_ceil(M, chunk_size), div_ceil(K, chunk_size));
+    dim3 blockDim(chunk_size * chunk_size); 
     // Launch the kernel 
-    naiveGeMMKernel<T><<<gridDim, blockDim>>>(A, B, C, M, N, K, alpha, beta);
+    GeMMKernel<T, chunk_size><<<gridDim, blockDim>>>(A, B, C, M, N, K, alpha, beta);
 }
 
 template void InvokeGeMM<int>(int* A,
