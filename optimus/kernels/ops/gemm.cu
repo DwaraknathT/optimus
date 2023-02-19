@@ -7,8 +7,6 @@ namespace optimus {
 // A nested namespace for all the core math ops 
 namespace ops {
 
-#define CEIL_DIV(M, N) ((M) + (N)-1) / (N)
-
 /*
 Simple general matrix multiplication kernel. 
 C = alpha * (A * B) + beta * C 
@@ -35,7 +33,7 @@ __global__ void GeMMKernel(T* A, T* B, T* C,
     __shared__ T B_chunk[chunk_size][chunk_size];
 
     T dot_product = 0; 
-    for (int chunk_idx = 0; chunk_idx < CEIL_DIV(N, chunk_size); chunk_idx++) {
+    for (int chunk_idx = 0; chunk_idx < (((N - 1) / chunk_size) + 1); chunk_idx++) {
 
         if (row < M && (chunk_idx * chunk_size + thread_col) < N) {
             const int A_index = (row * N) + (chunk_idx * chunk_size + thread_col);
