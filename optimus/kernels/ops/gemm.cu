@@ -58,9 +58,9 @@ __global__ void GeMMKernel(T* A, T* B, T* C,
                 dot_product += A_chunk[thread_row][i] * B_chunk[i][thread_col];
             }
         }   
-    }
 
-    __syncthreads(); 
+        __syncthreads();
+    } 
 
     if (row < M && col < K) {
         C[row * K + col] = dot_product;
