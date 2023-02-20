@@ -7,14 +7,6 @@ namespace optimus {
 // A nested namespace for all the core math ops 
 namespace ops {
 
-/*
-Simple general matrix multiplication kernel. 
-C = alpha * (A * B) + beta * C 
-Let's say we are multiplying 2 matrices A and B. 
-A = (M x N), B = (N x K). Then result C = (M x K). 
-
-c[i][j] = sum (A[i][k] * B[k][i] for k in range (0 to N))
-*/
 template<typename T, const int chunk_size> 
 __global__ void GeMMKernel(T* A, T* B, T* C, 
                             const uint32_t M, 
@@ -23,11 +15,11 @@ __global__ void GeMMKernel(T* A, T* B, T* C,
                             const float alpha, 
                             const float beta) {
     // Each thread operates on a single element in the result matrix. 
-    const int thread_row = threadIdx.x / chunk_size; 
-    const int thread_col = threadIdx.x % chunk_size; 
+    const int thread_row = threadIdx.x / blockDim.x; 
+    const int thread_col = threadIdx.x % blockDim.x; 
 
-    const uint32_t row = blockIdx.x * chunk_size + thread_row; 
-    const uint32_t col = blockIdx.y * chunk_size + thread_col; 
+    const uint32_t row = blockIdx.x * blockDim.x + thread_row; 
+    const uint32_t col = blockIdx.y * blockDim.x + thread_col; 
 
     __shared__ T A_chunk[chunk_size][chunk_size];
     __shared__ T B_chunk[chunk_size][chunk_size];
@@ -60,9 +52,9 @@ __global__ void GeMMKernel(T* A, T* B, T* C,
         if (row < M && col < K) {
             for (int i = 0; i < chunk_size; i++) {
                 T B_cache = B_chunk[i][thread_col];
-                for (int j = 0; j < chunk_size; j++) {
-                    const int current_row = blockIdx.x * chunk_size + j;
-                    temp_dot_prods[j] += A_chunk[j][i] * B_cache;
+                for (int current_thread_row = 0; current_thread_row < chunk_size; current_thread_row++) {
+                    const int current_row = blockIdx.x * chunk_size + current_thread_row;
+                    temp_dot_prods[current_thread_row] += A_chunk[current_thread_row][i] * B_cache;
                 }
             }
         }
@@ -71,18 +63,13 @@ __global__ void GeMMKernel(T* A, T* B, T* C,
     } 
 
     if (row < M && col < K) {
-        for (int j = 0; j < chunk_size; j++) {
-            const int current_row = blockIdx.x * chunk_size + j;
-            C[current_row * K + col] = temp_dot_prods[j];
+        for (int current_thread_row = 0; current_thread_row < chunk_size; current_thread_row++) {
+            const int current_row = blockIdx.x * chunk_size + current_thread_row;
+            C[current_row * K + col] = temp_dot_prods[current_thread_row];
         }
     }
 }
 
-/* General matrix multiplication kernel. 
-    C = A * B 
-To check if we can multiply A and B, the number of rows 
-of A must match the number of columns of B. 
-*/
 template <typename T>
 void InvokeGeMM(T* A,
                 T* B, 
@@ -92,12 +79,10 @@ void InvokeGeMM(T* A,
                 const uint32_t K, 
                 const float alpha, 
                 const float beta) {
-    // Naive Implementation - each thread in the kernels operates on one 
-    // element in the result matrix. Each block can have 1024 threads, so 
-    // threadDim is (32, 32) and Block dim is (M / 32, k / 32).
     const int chunk_size = 32; 
+    const int threads = 32;
     dim3 gridDim(div_ceil(M, chunk_size), div_ceil(K, chunk_size));
-    dim3 blockDim(chunk_size); 
+    dim3 blockDim(threads); 
     // Launch the kernel 
     GeMMKernel<T, chunk_size><<<gridDim, blockDim>>>(A, B, C, M, N, K, alpha, beta);
 }
