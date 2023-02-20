@@ -32,40 +32,50 @@ __global__ void GeMMKernel(T* A, T* B, T* C,
     __shared__ T A_chunk[chunk_size][chunk_size];
     __shared__ T B_chunk[chunk_size][chunk_size];
 
-    T dot_product = 0; 
+    T temp_dot_prods[chunk_size] = {0};
     for (int chunk_idx = 0; chunk_idx < (((N - 1) / chunk_size) + 1); chunk_idx++) {
 
-        if (row < M && (chunk_idx * chunk_size + thread_col) < N) {
-            const int A_index = (row * N) + (chunk_idx * chunk_size + thread_col);
-            A_chunk[thread_row][thread_col] = A[A_index];
-        }
-        else {
-            A_chunk[thread_row][thread_col] = 0; 
-        }
-        
-        if ((chunk_idx * chunk_size + thread_row) < N && (col < K)) {
-            const int B_index = (chunk_idx * chunk_size + thread_row) * K + col; 
-            B_chunk[thread_row][thread_col] = B[B_index];
-        }
-        else {
-            B_chunk[thread_row][thread_col] = 0;
+        for (int current_thread_row = 0; current_thread_row < chunk_size; current_thread_row++) {
+            const int current_row = blockIdx.x * chunk_size + current_thread_row;
+
+            if (current_row < M && (chunk_idx * chunk_size + thread_col) < N) {
+                const int A_index = (current_row * N) + (chunk_idx * chunk_size + thread_col);
+                A_chunk[current_thread_row][thread_col] = A[A_index];
+            }
+            else {
+                A_chunk[current_thread_row][thread_col] = 0; 
+            }
+            
+            if ((chunk_idx * chunk_size + current_thread_row) < N && (col < K)) {
+                const int B_index = (chunk_idx * chunk_size + current_thread_row) * K + col; 
+                B_chunk[current_thread_row][thread_col] = B[B_index];
+            }
+            else {
+                B_chunk[current_thread_row][thread_col] = 0;
+            }
         }
 
         __syncthreads();
 
         if (row < M && col < K) {
             for (int i = 0; i < chunk_size; i++) {
-                dot_product += A_chunk[thread_row][i] * B_chunk[i][thread_col];
+                T B_cache = B_chunk[i][thread_col];
+                for (int j = 0; j < chunk_size; j++) {
+                    const int current_row = blockIdx.x * chunk_size + j;
+                    temp_dot_prods[j] += A_chunk[j][i] * B_cache;
+                }
             }
-        }   
+        }
 
         __syncthreads();
     } 
 
     if (row < M && col < K) {
-        C[row * K + col] = dot_product;
+        for (int j = 0; j < chunk_size; j++) {
+            const int current_row = blockIdx.x * chunk_size + j;
+            C[current_row * K + col] = temp_dot_prods[j];
+        }
     }
-
 }
 
 /* General matrix multiplication kernel. 
@@ -87,7 +97,7 @@ void InvokeGeMM(T* A,
     // threadDim is (32, 32) and Block dim is (M / 32, k / 32).
     const int chunk_size = 32; 
     dim3 gridDim(div_ceil(M, chunk_size), div_ceil(K, chunk_size));
-    dim3 blockDim(chunk_size * chunk_size); 
+    dim3 blockDim(chunk_size); 
     // Launch the kernel 
     GeMMKernel<T, chunk_size><<<gridDim, blockDim>>>(A, B, C, M, N, K, alpha, beta);
 }
