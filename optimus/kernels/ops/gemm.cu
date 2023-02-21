@@ -28,8 +28,8 @@ __global__ void GeMMKernel(T* A, T* B, T* C,
     
     for (int chunk_idx = 0; chunk_idx < (((N - 1) / chunk_size) + 1); chunk_idx++) {
         for (int current_result = 0; current_result < results_per_thread; current_result++) {
-
-            const int current_row = blockIdx.x * blockDim.x + current_result;
+            const int current_row = row + current_result;
+            const int current_t_row = thread_row + current_result; 
 
             if (current_row < M && (chunk_idx * chunk_size + thread_col) < N) {
                 const int A_index = (current_row * N) + (chunk_idx * chunk_size + thread_col);
@@ -39,8 +39,8 @@ __global__ void GeMMKernel(T* A, T* B, T* C,
                 A_chunk[current_result][thread_col] = 0; 
             }
             
-            if ((chunk_idx * chunk_size + current_result) < N && (col < K)) {
-                const int B_index = (chunk_idx * chunk_size + current_result) * K + col; 
+            if ((chunk_idx * chunk_size + current_t_row) < N && (col < K)) {
+                const int B_index = (chunk_idx * chunk_size + current_t_row) * K + col; 
                 B_chunk[current_result][thread_col] = B[B_index];
             }
             else {
@@ -50,21 +50,19 @@ __global__ void GeMMKernel(T* A, T* B, T* C,
 
         __syncthreads();
 
-        if (row < M && col < K) {
-            for (int i = 0; i < chunk_size; i++) {
-                T B_cache = B_chunk[i][thread_col];
-                for (int current_result = 0; current_result < results_per_thread; current_result++) {
-                    dot_products[current_result] += A_chunk[current_result][i] * B_cache;
-                }
+        for (int i = 0; i < chunk_size; i++) {
+            T B_cache = B_chunk[i][thread_col];
+            for (int current_result = 0; current_result < results_per_thread; current_result++) {
+                dot_products[current_result] += A_chunk[current_result][i] * B_cache;
             }
         }
 
         __syncthreads();
     } 
 
-    if (row < M && col < K) {
-        for (int current_result = 0; current_result < results_per_thread; current_result++) {
-            const int current_row = blockIdx.x * blockDim.x + current_result;
+    for (int current_result = 0; current_result < results_per_thread; current_result++) {
+        const int current_row = row + current_result;
+        if (current_row < M && col < K) {
             C[current_row * K + col] = dot_products[current_result];
         }
     }
