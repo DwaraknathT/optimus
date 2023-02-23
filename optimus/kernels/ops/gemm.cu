@@ -20,8 +20,8 @@ __global__ void GeMMKernel(T* A, T* B, T* C,
                             const float alpha, 
                             const float beta) {
 
-    __shared__ T A_chunk[M_chunk_size][N_chunk_size];
-    __shared__ T B_chunk[N_chunk_size][K_chunk_size];
+    __shared__ T A_chunk[M_chunk_size][N_chunk_size + 1];
+    __shared__ T B_chunk[N_chunk_size][K_chunk_size + 1];
     
     const int block_row = blockIdx.x * M_chunk_size;
     const int block_col = blockIdx.y * K_chunk_size; 
@@ -40,6 +40,9 @@ __global__ void GeMMKernel(T* A, T* B, T* C,
     const int C_thread_rows = blockDim.x / C_thread_cols;
     const int thread_row_in_C = threadIdx.x / C_thread_cols;
     const int thread_col_in_C = threadIdx.x % C_thread_cols;
+
+    T A_cache[result_tile_rows] = {0};
+    T B_cache[result_tile_cols] = {0};
 
     T results_per_thread[result_tile_rows][result_tile_cols] = {0};
 
@@ -78,29 +81,31 @@ __global__ void GeMMKernel(T* A, T* B, T* C,
 
         __syncthreads();
 
-        for (int result_row_offset = 0; result_row_offset < M_chunk_size; result_row_offset += C_thread_rows) {
-            for (int result_col_offset = 0; result_col_offset < M_chunk_size; result_col_offset += C_thread_cols) {
+        for (int inner_dim = 0; inner_dim < N_chunk_size; inner_dim++) {
 
-                const int current_result_row_in_C = thread_row_in_C + result_row_offset;
-                const int current_result_col_in_C = thread_col_in_C + result_col_offset;
+            for (int result_row_offset = 0; result_row_offset < result_tile_rows; result_row_offset++) {
+                A_cache[result_row_offset] = A_chunk[thread_row_in_C * result_tile_rows + result_row_offset][inner_dim];
+            }
+            for (int result_col_offset = 0; result_col_offset < result_tile_cols; result_col_offset++) {
+                B_cache[result_col_offset] = B_chunk[inner_dim][thread_col_in_C * result_tile_cols + result_col_offset];
+            }
 
-                for (int inner_dim = 0; inner_dim < N_chunk_size; inner_dim++) {
-                    results_per_thread[result_row_offset / result_tile_rows][result_col_offset / result_tile_cols] += A_chunk[current_result_row_in_C][inner_dim] * B_chunk[inner_dim][current_result_col_in_C];
+            for (int result_row_offset = 0; result_row_offset < result_tile_rows; result_row_offset++) {
+                for (int result_col_offset = 0; result_col_offset < result_tile_cols; result_col_offset++) {
+                    results_per_thread[result_row_offset][result_col_offset] += A_cache[result_row_offset] * B_cache[result_col_offset];
                 }
             }
         }
-
         __syncthreads();
     }
 
-    for (int result_row_offset = 0; result_row_offset < M_chunk_size; result_row_offset += C_thread_rows) {
-        for (int result_col_offset = 0; result_col_offset < M_chunk_size; result_col_offset += C_thread_cols) {
+    for (int result_row_offset = 0; result_row_offset < result_tile_rows; result_row_offset++) {
+        for (int result_col_offset = 0; result_col_offset < result_tile_cols; result_col_offset++) {
+            const int current_result_row = block_row + thread_row_in_C * result_tile_rows + result_row_offset;
+            const int current_result_col = block_col + thread_col_in_C * result_tile_cols + result_col_offset; 
 
-            const int current_result_row_in_C = block_row + thread_row_in_C + result_row_offset;
-            const int current_result_col_in_C = block_col + thread_col_in_C + result_col_offset;
-
-            if (current_result_row_in_C < M && current_result_col_in_C < K) {
-                C[current_result_row_in_C * K + current_result_col_in_C] = results_per_thread[result_row_offset / result_tile_rows][result_col_offset / result_tile_cols];
+            if (current_result_row < M && current_result_col < K) {
+                C[current_result_row * K + current_result_col] = results_per_thread[result_row_offset][result_col_offset];
             }
 
         }
