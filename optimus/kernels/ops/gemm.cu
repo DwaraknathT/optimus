@@ -7,65 +7,105 @@ namespace optimus {
 // A nested namespace for all the core math ops 
 namespace ops {
 
-template<typename T, const int chunk_size, const int results_per_thread> 
+template<typename T, 
+         const int M_chunk_size, 
+         const int N_chunk_size, 
+         const int K_chunk_size, 
+         const int result_tile_rows, 
+         const int result_tile_cols> 
 __global__ void GeMMKernel(T* A, T* B, T* C, 
                             const uint32_t M, 
                             const uint32_t N, 
                             const uint32_t K, 
                             const float alpha, 
                             const float beta) {
-    // Each thread operates on a single element in the result matrix. 
-    const int thread_row = threadIdx.x / blockDim.x; 
-    const int thread_col = threadIdx.x % blockDim.x; 
 
-    const uint32_t row = blockIdx.x * blockDim.x + thread_row; 
-    const uint32_t col = blockIdx.y * blockDim.x + thread_col; 
-
-    __shared__ T A_chunk[chunk_size][chunk_size];
-    __shared__ T B_chunk[chunk_size][chunk_size];
-
-    T dot_products[results_per_thread] = {0};
+    __shared__ T A_chunk[M_chunk_size][N_chunk_size];
+    __shared__ T B_chunk[N_chunk_size][K_chunk_size];
     
-    for (int chunk_idx = 0; chunk_idx < (((N - 1) / chunk_size) + 1); chunk_idx++) {
-        for (int current_result = 0; current_result < results_per_thread; current_result++) {
-            const int current_row = row + current_result;
-            const int current_t_row = thread_row + current_result; 
+    const int block_row = blockIdx.x * M_chunk_size;
+    const int block_col = blockIdx.y * K_chunk_size; 
+ 
+    const int A_thread_cols = N_chunk_size;
+    const int A_thread_rows = blockDim.x / A_thread_cols; 
+    const int thread_row_in_A = threadIdx.x / A_thread_cols;
+    const int thread_col_in_A = threadIdx.x % A_thread_cols; 
 
-            if (current_row < M && (chunk_idx * chunk_size + thread_col) < N) {
-                const int A_index = (current_row * N) + (chunk_idx * chunk_size + thread_col);
-                A_chunk[current_result][thread_col] = A[A_index];
+    const int B_thread_cols = K_chunk_size;
+    const int B_thread_rows = blockDim.x / B_thread_cols; 
+    const int thread_row_in_B = threadIdx.x / B_thread_cols;
+    const int thread_col_in_B = threadIdx.x % B_thread_cols; 
+
+    const int C_thread_cols = (K_chunk_size / result_tile_cols);
+    const int C_thread_rows = blockDim.x / C_thread_cols;
+    const int thread_row_in_C = threadIdx.x / C_thread_cols;
+    const int thread_col_in_C = threadIdx.x % C_thread_cols;
+
+    T results_per_thread[result_tile_rows][result_tile_cols] = {0};
+
+    for (int chunk_idx = 0; chunk_idx < (((N - 1) / N_chunk_size) + 1); chunk_idx++) {
+
+        // We want the threads to load A and B in a memory coalesced fashion. 
+        for (int A_row_offset = 0; A_row_offset < M_chunk_size; A_row_offset += A_thread_rows) {
+
+            const int current_thread_row_in_A = thread_row_in_A + A_row_offset;
+            const int current_A_row = block_row + current_thread_row_in_A; 
+            const int current_A_col = chunk_idx * N_chunk_size + thread_col_in_A; 
+
+            if (current_A_row < M && current_A_col < N) {
+                const int A_index = current_A_row * N + current_A_col;
+                A_chunk[current_thread_row_in_A][thread_col_in_A] = A[A_index];
             }
             else {
-                A_chunk[current_result][thread_col] = 0; 
+                A_chunk[current_thread_row_in_A][thread_col_in_A] = 0; 
             }
-            
-            if ((chunk_idx * chunk_size + current_t_row) < N && (col < K)) {
-                const int B_index = (chunk_idx * chunk_size + current_t_row) * K + col; 
-                B_chunk[current_result][thread_col] = B[B_index];
+        }
+
+        // Similarly load B 
+        for (int B_row_offset = 0; B_row_offset < N_chunk_size; B_row_offset += B_thread_rows) {
+            const int current_thread_row_in_B = thread_row_in_B + B_row_offset;
+            const int current_B_row = chunk_idx * N_chunk_size + current_thread_row_in_B; 
+            const int current_B_col = block_col + thread_col_in_B; 
+
+            if (current_B_row < N && current_B_col < K) {
+                const int B_index = current_B_row * K + current_B_col;
+                B_chunk[current_thread_row_in_B][thread_col_in_B] = B[B_index];
             }
             else {
-                B_chunk[current_result][thread_col] = 0;
+                B_chunk[current_thread_row_in_B][thread_col_in_B] = 0; 
             }
         }
 
         __syncthreads();
 
-        for (int i = 0; i < chunk_size; i++) {
-            T B_cache = B_chunk[i][thread_col];
-            for (int current_result = 0; current_result < results_per_thread; current_result++) {
-                dot_products[current_result] += A_chunk[current_result][i] * B_cache;
+        for (int result_row_offset = 0; result_row_offset < M_chunk_size; result_row_offset += C_thread_rows) {
+            for (int result_col_offset = 0; result_col_offset < M_chunk_size; result_col_offset += C_thread_cols) {
+
+                const int current_result_row_in_C = thread_row_in_C + result_row_offset;
+                const int current_result_col_in_C = thread_col_in_C + result_col_offset;
+
+                for (int inner_dim = 0; inner_dim < N_chunk_size; inner_dim++) {
+                    results_per_thread[result_row_offset / result_tile_rows][result_col_offset / result_tile_cols] += A_chunk[current_result_row_in_C][inner_dim] * B_chunk[inner_dim][current_result_col_in_C];
+                }
             }
         }
 
         __syncthreads();
-    } 
+    }
 
-    for (int current_result = 0; current_result < results_per_thread; current_result++) {
-        const int current_row = row + current_result;
-        if (current_row < M && col < K) {
-            C[current_row * K + col] = dot_products[current_result];
+    for (int result_row_offset = 0; result_row_offset < M_chunk_size; result_row_offset += C_thread_rows) {
+        for (int result_col_offset = 0; result_col_offset < M_chunk_size; result_col_offset += C_thread_cols) {
+
+            const int current_result_row_in_C = block_row + thread_row_in_C + result_row_offset;
+            const int current_result_col_in_C = block_col + thread_col_in_C + result_col_offset;
+
+            if (current_result_row_in_C < M && current_result_col_in_C < K) {
+                C[current_result_row_in_C * K + current_result_col_in_C] = results_per_thread[result_row_offset / result_tile_rows][result_col_offset / result_tile_cols];
+            }
+
         }
     }
+
 }
 
 template <typename T>
@@ -77,13 +117,29 @@ void InvokeGeMM(T* A,
                 const uint32_t K, 
                 const float alpha, 
                 const float beta) {
-    const int chunk_size = 32; 
-    const int threads = 32;
-    const int results_pre_thread = 32;
-    dim3 gridDim(div_ceil(M, chunk_size), div_ceil(K, chunk_size));
+    
+    const int M_chunk_size = 32;
+    const int N_chunk_size = 32;
+    const int K_chunk_size = 32; 
+    const int result_tile_rows = 4;
+    const int result_tile_cols = 4; 
+
+    // (32 * 32) / 16 = 64 threads 
+    const int threads = div_ceil(M_chunk_size * K_chunk_size, result_tile_rows * result_tile_cols);
+
+    dim3 gridDim(div_ceil(M, M_chunk_size), div_ceil(K, K_chunk_size));
     dim3 blockDim(threads); 
+
+    printf("Launching grid with dims x: %d, y: %d \n", gridDim.x, gridDim.y);
+    printf("Threads in a block %d \n", blockDim.x);
+
     // Launch the kernel 
-    GeMMKernel<T, chunk_size, results_pre_thread><<<gridDim, blockDim>>>(A, B, C, M, N, K, alpha, beta);
+    GeMMKernel<T, 
+               M_chunk_size, 
+               N_chunk_size, 
+               K_chunk_size, 
+               result_tile_rows, 
+               result_tile_cols><<<gridDim, blockDim>>>(A, B, C, M, N, K, alpha, beta);
 }
 
 template void InvokeGeMM<int>(int* A,
