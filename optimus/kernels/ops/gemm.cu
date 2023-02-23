@@ -41,9 +41,6 @@ __global__ void GeMMKernel(T* A, T* B, T* C,
     const int thread_row_in_C = threadIdx.x / C_thread_cols;
     const int thread_col_in_C = threadIdx.x % C_thread_cols;
 
-    T A_cache[result_tile_rows] = {0};
-    T B_cache[result_tile_cols] = {0};
-
     T results_per_thread[result_tile_rows][result_tile_cols] = {0};
 
     for (int chunk_idx = 0; chunk_idx < (((N - 1) / N_chunk_size) + 1); chunk_idx++) {
@@ -121,8 +118,8 @@ void InvokeGeMM(T* A,
     const int M_chunk_size = 64;
     const int N_chunk_size = 64;
     const int K_chunk_size = 64; 
-    const int result_tile_rows = 8;
-    const int result_tile_cols = 8; 
+    const int result_tile_rows = 4;
+    const int result_tile_cols = 4; 
 
     // (32 * 32) / 16 = 64 threads 
     const int threads = div_ceil(M_chunk_size * K_chunk_size, result_tile_rows * result_tile_cols);
