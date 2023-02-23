@@ -82,35 +82,30 @@ __global__ void GeMMKernel(T* A, T* B, T* C,
         __syncthreads();
 
         for (int inner_dim = 0; inner_dim < N_chunk_size; inner_dim++) {
-
-            for (int result_row_offset = 0; result_row_offset < result_tile_rows; result_row_offset++) {
-                A_cache[result_row_offset] = A_chunk[thread_row_in_C * result_tile_rows + result_row_offset][inner_dim];
-            }
-            for (int result_col_offset = 0; result_col_offset < result_tile_cols; result_col_offset++) {
-                B_cache[result_col_offset] = B_chunk[inner_dim][thread_col_in_C * result_tile_cols + result_col_offset];
-            }
-
             for (int result_row_offset = 0; result_row_offset < result_tile_rows; result_row_offset++) {
                 for (int result_col_offset = 0; result_col_offset < result_tile_cols; result_col_offset++) {
-                    results_per_thread[result_row_offset][result_col_offset] += A_cache[result_row_offset] * B_cache[result_col_offset];
+                    const int current_result_row_in_C = result_row_offset * C_thread_rows + thread_row_in_C;
+                    const int current_result_col_in_C = result_col_offset * C_thread_cols + thread_col_in_C;
+
+                    results_per_thread[result_row_offset][result_col_offset] += A_chunk[current_result_row_in_C][inner_dim] * B_chunk[inner_dim][current_result_col_in_C];
                 }
             }
         }
+
         __syncthreads();
     }
 
     for (int result_row_offset = 0; result_row_offset < result_tile_rows; result_row_offset++) {
         for (int result_col_offset = 0; result_col_offset < result_tile_cols; result_col_offset++) {
-            const int current_result_row = block_row + thread_row_in_C * result_tile_rows + result_row_offset;
-            const int current_result_col = block_col + thread_col_in_C * result_tile_cols + result_col_offset; 
+            const int current_result_row_in_C = block_row + result_row_offset * C_thread_rows + thread_row_in_C;
+            const int current_result_col_in_C = block_col + result_col_offset * C_thread_cols + thread_col_in_C;
 
-            if (current_result_row < M && current_result_col < K) {
-                C[current_result_row * K + current_result_col] = results_per_thread[result_row_offset][result_col_offset];
+            if (current_result_row_in_C < M && current_result_col_in_C < K) {
+                C[current_result_row_in_C * K + current_result_col_in_C] = results_per_thread[result_row_offset][result_col_offset];
             }
 
         }
     }
-
 }
 
 template <typename T>
@@ -123,11 +118,11 @@ void InvokeGeMM(T* A,
                 const float alpha, 
                 const float beta) {
     
-    const int M_chunk_size = 32;
-    const int N_chunk_size = 32;
-    const int K_chunk_size = 32; 
-    const int result_tile_rows = 4;
-    const int result_tile_cols = 4; 
+    const int M_chunk_size = 64;
+    const int N_chunk_size = 64;
+    const int K_chunk_size = 64; 
+    const int result_tile_rows = 8;
+    const int result_tile_cols = 8; 
 
     // (32 * 32) / 16 = 64 threads 
     const int threads = div_ceil(M_chunk_size * K_chunk_size, result_tile_rows * result_tile_cols);
