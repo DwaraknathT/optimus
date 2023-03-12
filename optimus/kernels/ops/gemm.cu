@@ -22,13 +22,16 @@ namespace optimus
                   const int M_warp_subtile_size,
                   const int K_warp_subtile_size,
                   const int result_tile_rows,
-                  const int result_tile_cols>
-        __global__ void GeMMKernel(T *A, T *B, T *C,
-                                   const uint32_t M,
-                                   const uint32_t N,
-                                   const uint32_t K,
-                                   const float alpha,
-                                   const float beta)
+                  const int result_tile_cols,
+                  const int NUM_THREADS>
+        __global__ void __launch_bounds__(NUM_THREADS) GeMMKernel(const T *__restrict__ A,
+                                                                  const T *__restrict__ B,
+                                                                  T *C,
+                                                                  const uint32_t M,
+                                                                  const uint32_t N,
+                                                                  const uint32_t K,
+                                                                  const float alpha,
+                                                                  const float beta)
         {
 
             __shared__ T A_chunk[N_chunk_size][M_chunk_size + 1];
@@ -103,11 +106,13 @@ namespace optimus
 
                 __syncthreads();
 
+#pragma unroll
                 for (int inner_dim = 0; inner_dim < N_chunk_size; inner_dim++)
                 {
-
+#pragma unroll
                     for (int M_warp_subtile_iter = 0; M_warp_subtile_iter < M_warp_subtile_iters; M_warp_subtile_iter++)
                     {
+#pragma unroll
                         for (int result_row_offset = 0; result_row_offset < result_tile_rows; result_row_offset++)
                         {
                             // Go to the warp tile
@@ -121,8 +126,10 @@ namespace optimus
                         }
                     }
 
+#pragma unroll
                     for (int K_warp_subtile_iter = 0; K_warp_subtile_iter < K_warp_subtile_iters; K_warp_subtile_iter++)
                     {
+#pragma unroll
                         for (int result_col_offset = 0; result_col_offset < result_tile_cols; result_col_offset++)
                         {
                             // Go to the warp tile
@@ -136,12 +143,16 @@ namespace optimus
                         }
                     }
 
+#pragma unroll
                     for (int M_warp_subtile_iter = 0; M_warp_subtile_iter < M_warp_subtile_iters; M_warp_subtile_iter++)
                     {
+#pragma unroll
                         for (int K_warp_subtile_iter = 0; K_warp_subtile_iter < K_warp_subtile_iters; K_warp_subtile_iter++)
                         {
+#pragma unroll
                             for (int result_row_offset = 0; result_row_offset < result_tile_rows; result_row_offset++)
                             {
+#pragma unroll
                                 for (int result_col_offset = 0; result_col_offset < result_tile_cols; result_col_offset++)
                                 {
                                     results_per_thread[M_warp_subtile_iter][K_warp_subtile_iter][result_row_offset][result_col_offset] +=
@@ -155,12 +166,16 @@ namespace optimus
                 __syncthreads();
             }
 
+#pragma unroll
             for (int M_warp_subtile_iter = 0; M_warp_subtile_iter < M_warp_subtile_iters; M_warp_subtile_iter++)
             {
+#pragma unroll
                 for (int K_warp_subtile_iter = 0; K_warp_subtile_iter < K_warp_subtile_iters; K_warp_subtile_iter++)
                 {
+#pragma unroll
                     for (int result_row_offset = 0; result_row_offset < result_tile_rows; result_row_offset++)
                     {
+#pragma unroll
                         for (int result_col_offset = 0; result_col_offset < result_tile_cols; result_col_offset++)
                         {
 
@@ -240,7 +255,8 @@ namespace optimus
                        M_warp_subtile_size,
                        K_warp_subtile_size,
                        result_tile_rows,
-                       result_tile_cols><<<gridDim, blockDim>>>(A, B, C, M, N, K, alpha, beta);
+                       result_tile_cols,
+                       threads><<<gridDim, blockDim>>>(A, B, C, M, N, K, alpha, beta);
         }
 
         template void InvokeGeMM<int>(int *A,
