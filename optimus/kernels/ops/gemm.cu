@@ -217,7 +217,7 @@ namespace optimus
         {
 
             const int M_chunk_size = 64;
-            const int N_chunk_size = 16;
+            const int N_chunk_size = 32;
             const int K_chunk_size = 128;
 
             const int threads = 128; // 4 warps.
