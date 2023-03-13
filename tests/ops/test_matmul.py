@@ -1,9 +1,9 @@
 from pyoptimus import math 
 import numpy as np 
 
-a = np.random.rand(128, 128).astype(np.float32)
-b = np.random.rand(128, 128).astype(np.float32)
-c = np.zeros((128, 128)).astype(np.float32)
+a = np.random.rand(123, 567).astype(np.float32)
+b = np.random.rand(567, 328).astype(np.float32)
+c = np.zeros((123, 328)).astype(np.float32)
 reference = np.matmul(a, b) 
 
 math.matmul(a, b, c) 
