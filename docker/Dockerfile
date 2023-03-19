@@ -43,10 +43,10 @@ RUN apt-get update -y && \
         wget && \
     rm -rf /var/lib/apt/lists/*
 RUN echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
-    wget -qO - https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub | apt-key add - && \
+    wget -qO - https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub | apt-key add - && \
     apt-get update -y && \
-    apt-get install -y --no-install-recommends nsight-compute-2022.4.1 && \
+    apt-get install -y --no-install-recommends nsight-compute-2023.1.0 && \
     rm -rf /var/lib/apt/lists/*
-ENV PATH="/opt/nvidia/nsight-compute/2022.4.1:${PATH}"
+ENV PATH="/opt/nvidia/nsight-compute/2023.1.0:${PATH}"
 
 WORKDIR /workspace/host/optimus

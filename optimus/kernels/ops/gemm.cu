@@ -74,10 +74,9 @@ namespace optimus
                     const int current_thread_row_in_A = thread_row_in_A + A_row_offset;
                     const int current_A_row = block_row + current_thread_row_in_A;
                     const int current_A_col = chunk_idx * N_chunk_size + thread_col_in_A;
-
+                    const int A_index = current_A_row * N + current_A_col;
                     if (current_A_row < M && current_A_col < N)
                     {
-                        const int A_index = current_A_row * N + current_A_col;
                         A_chunk[thread_col_in_A][current_thread_row_in_A] = A[A_index];
                     }
                     else
@@ -92,10 +91,9 @@ namespace optimus
                     const int current_thread_row_in_B = thread_row_in_B + B_row_offset;
                     const int current_B_row = chunk_idx * N_chunk_size + current_thread_row_in_B;
                     const int current_B_col = block_col + thread_col_in_B;
-
+                    const int B_index = current_B_row * K + current_B_col;
                     if (current_B_row < N && current_B_col < K)
                     {
-                        const int B_index = current_B_row * K + current_B_col;
                         B_chunk[current_thread_row_in_B][thread_col_in_B] = B[B_index];
                     }
                     else
