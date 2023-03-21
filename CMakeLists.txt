@@ -107,7 +107,6 @@ add_subdirectory(examples)
 add_library(optimus SHARED 
     $<TARGET_OBJECTS:memanager>
     $<TARGET_OBJECTS:log_utils>
-    $<TARGET_OBJECTS:tensor>
     $<TARGET_OBJECTS:gemm_kernels>
     $<TARGET_OBJECTS:arithmetic_kernels>
 )

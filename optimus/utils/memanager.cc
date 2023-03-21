@@ -32,7 +32,7 @@ Custom malloc that handles allocating memory on host pageable,
 host pinned and device memories based on the memory type requested. 
 */
 void* optimus::MemManager::allocate(const size_t size, 
-                                    memorytype mem_type, 
+                                    MemoryType mem_type, 
                                     bool is_set_to_zero, 
                                     std::string name) {
     void* mem_ptr;
@@ -41,15 +41,15 @@ void* optimus::MemManager::allocate(const size_t size,
         mem_ptr = nullptr; 
     }
     // If memtype is cpu, then do normal malloc 
-    if (mem_type == memorytype::MEMORY_CPU) {
+    if (mem_type == MemoryType::MEMORY_CPU) {
         mem_ptr = (void*)malloc(size);
     }
-    else if (mem_type == memorytype::MEMORY_CPU_PINNED) {
+    else if (mem_type == MemoryType::MEMORY_CPU_PINNED) {
         cudaError_t status = cudaMallocHost((void**)&mem_ptr, size);
         if (status != cudaSuccess)
             printf("Error allocating pinned host memory\n");
     }
-    else if (mem_type == memorytype::MEMORY_GPU) {
+    else if (mem_type == MemoryType::MEMORY_GPU) {
         cudaError_t status = cudaMalloc((void**)&mem_ptr, size);
         if (status != cudaSuccess)
             printf("Error allocating GPU memory\n");
@@ -70,20 +70,20 @@ Custom malloc that handles de-allocating memory on host pageable,
 host pinned and device memories based on the memory type requested. 
 */
 void optimus::MemManager::deallocate(void** ptr, 
-                                     memorytype mem_type, 
+                                     MemoryType mem_type, 
                                      std::string name) {
 
     // If name is nor provided, then generate a name 
     std::string key = (name == "") ? generateName(ptr) : name;
-    if (mem_type == memorytype::MEMORY_CPU) {
+    if (mem_type == MemoryType::MEMORY_CPU) {
         free(ptr);
     }
-    else if (mem_type == memorytype::MEMORY_CPU_PINNED) {
+    else if (mem_type == MemoryType::MEMORY_CPU_PINNED) {
         cudaError_t status = cudaFreeHost(ptr);
         if (status != cudaSuccess)
             printf("Error freeing GPU memory\n");
     }
-    else if (mem_type == memorytype::MEMORY_GPU) {
+    else if (mem_type == MemoryType::MEMORY_GPU) {
         cudaError_t status = cudaFree(ptr);
         if (status != cudaSuccess)
             printf("Error freeing GPU memory\n");

@@ -27,7 +27,7 @@ memory to pinned host memory, and then to device memory. This
 is slow compared to just placing the variables in pinned host 
 memory as that would only involve 1 mem copy. 
 */
-enum memorytype {
+enum MemoryType {
     MEMORY_CPU, 
     MEMORY_GPU, 
     MEMORY_CPU_PINNED
@@ -38,14 +38,14 @@ class MemManager {
     */
    private: 
         // A map from variable names to their pointers. 
-        std::unordered_map<std::string, std::tuple<void*, size_t, memorytype>>* pointer_mapping_; 
+        std::unordered_map<std::string, std::tuple<void*, size_t, MemoryType>>* pointer_mapping_; 
         // Cuda stream to use for mem allocation. 
         cudaStream_t stream_ = 0; 
 
     public:
         // Constructor 
         MemManager(const std::string manager_name = "") {
-            pointer_mapping_ = new std::unordered_map<std::string, std::tuple<void*, size_t, memorytype>>();
+            pointer_mapping_ = new std::unordered_map<std::string, std::tuple<void*, size_t, MemoryType>>();
         }
         // Destructor 
         ~MemManager(){
@@ -65,9 +65,9 @@ class MemManager {
         // Function to generate a string identifier for a pointer if non is provided.
         std::string generateName(const void* ptr);
         // Function to allocate memory in pageable, pinned host, and device memories and a name to address that memory chunk.
-        void* allocate(const size_t size, memorytype mem_type, bool is_set_to_zero = false, std::string name = ""); 
+        void* allocate(const size_t size, MemoryType mem_type, bool is_set_to_zero = false, std::string name = ""); 
         // Custom free function
-        void deallocate(void** ptr, memorytype mem_type, std::string name = "");
+        void deallocate(void** ptr, MemoryType mem_type, std::string name = "");
 
 };
 
