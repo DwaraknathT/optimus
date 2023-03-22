@@ -11,5 +11,5 @@ docker compose build
 ```
 Then start the docker container in interactive mode with bash
 ```
-nvidia-docker run -v ~/.ssh:/root/.ssh:Z -v ~/optimus/:/workspace/host/optimus --ipc=host -ti optimus:dev bash
+sudo nvidia-docker run --cap-add=SYS_ADMIN -v ~/.ssh:/root/.ssh:Z -v ~/optimus/:/workspace/host/optimus --ipc=host -ti optimus:dev bash
 ```

@@ -3,6 +3,19 @@ version: '3.4'
 services:
   optimus:
     image: optimus:dev
+    command: nvidia-smi
+    stdin_open: true
+    tty: true
+    runtime: nvidia
+    ipc: host
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      PYTHONPATH: /workspace/host/optimus/build/lib/
     build:
       context: .
+      ssh:
+        - default
       dockerfile: docker/Dockerfile
+    volumes:
+      - ~/.ssh:/root/.ssh
+      - ~/optimus/:/workspace/host/optimus
