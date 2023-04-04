@@ -2,6 +2,7 @@
 #include <curand.h>
 #include <iostream>
 #include "optimus/kernels/ops/gemm.h"
+#include "optimus/kernels/ops/affine_transform.h"
 #include "optimus/utils/memanager.h"
 
 using namespace optimus;
@@ -33,7 +34,7 @@ void gpu_blas_mmul(const float* A, const float* B, float* C, const int m,
     cublasDestroy(handle);
 }
 
-int main() {
+void test_matmul() {
     const uint32_t m = 32 * 2048;
     const uint32_t n = 1024;
     const uint32_t k = 1024 * 3;
@@ -44,10 +45,6 @@ int main() {
     const float beta = 0;
 
     auto memory_manager = new optimus::MemManager();
-    float* h_a =
-        (float*)(memory_manager->allocate(size_a, optimus::MEMORY_CPU));
-    float* h_b =
-        (float*)(memory_manager->allocate(size_b, optimus::MEMORY_CPU));
     float* h_c =
         (float*)(memory_manager->allocate(size_c, optimus::MEMORY_CPU));
 
@@ -57,31 +54,50 @@ int main() {
         (float*)(memory_manager->allocate(size_b, optimus::MEMORY_GPU));
     float* d_c =
         (float*)(memory_manager->allocate(size_c, optimus::MEMORY_GPU));
-
-    // random initialize matrix A
-    for (uint32_t i = 0; i < m; ++i) {
-        for (uint32_t j = 0; j < n; ++j) {
-            h_a[i * n + j] = (float)((i * n + j) % 1024);
-        }
-    }
-
-    // random initialize matrix B
-    for (uint32_t i = 0; i < n; ++i) {
-        for (uint32_t j = 0; j < k; ++j) {
-            h_b[i * k + j] = (float)((i * n + j) % 1024);
-        }
-    }
-
-    cudaMemcpy(d_a, h_a, size_a, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_b, h_b, size_b, cudaMemcpyHostToDevice);
-    // GPU_fill_rand(d_a, m, n);
-    // GPU_fill_rand(d_b, n, k);
+        
+    GPU_fill_rand(d_a, m, n);
+    GPU_fill_rand(d_b, n, k);
 
     optimus::ops::InvokeGeMM<float>(d_a, d_b, d_c, m, n, k, alpha, beta);
     gpu_blas_mmul(d_a, d_b, d_c, m, n, k);
 
     cudaMemcpy(d_c, h_c, size_c, cudaMemcpyDeviceToHost);
     delete memory_manager;
+}
 
+void test_affine_transform() {
+    const uint32_t m = 32 * 2048;
+    const uint32_t n = 1024;
+    const uint32_t k = 1024 * 3;
+    const size_t size_a = sizeof(float) * m * n;
+    const size_t size_b = sizeof(float) * n * k;
+    const size_t size_bias = sizeof(float) * k;
+    const size_t size_c = sizeof(float) * m * k;
+
+    auto memory_manager = new optimus::MemManager();
+    float* h_c =
+        (float*)(memory_manager->allocate(size_c, optimus::MEMORY_CPU));
+
+    float* d_a =
+        (float*)(memory_manager->allocate(size_a, optimus::MEMORY_GPU));
+    float* d_b =
+        (float*)(memory_manager->allocate(size_b, optimus::MEMORY_GPU));
+    float* d_bias =
+        (float*)(memory_manager->allocate(size_bias, optimus::MEMORY_GPU));
+    float* d_c =
+        (float*)(memory_manager->allocate(size_c, optimus::MEMORY_GPU));
+
+    GPU_fill_rand(d_a, m, n);
+    GPU_fill_rand(d_b, n, k);
+    GPU_fill_rand(d_bias, 1, k);
+
+    optimus::ops::InvokeAffineTransformation<float>(d_a, d_b, d_bias, d_c, m, n, k);
+
+    cudaMemcpy(d_c, h_c, size_c, cudaMemcpyDeviceToHost);
+    delete memory_manager;
+}
+
+int main() {
+    test_affine_transform();
     return 0;
 }

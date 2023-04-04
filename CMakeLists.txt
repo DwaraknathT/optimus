@@ -108,6 +108,7 @@ add_library(optimus SHARED
     $<TARGET_OBJECTS:memanager>
     $<TARGET_OBJECTS:log_utils>
     $<TARGET_OBJECTS:gemm_kernels>
+    $<TARGET_OBJECTS:affine_transforms>
     $<TARGET_OBJECTS:arithmetic_kernels>
 )
 set_property(TARGET optimus PROPERTY POSITION_INDEPENDENT_CODE ON)
