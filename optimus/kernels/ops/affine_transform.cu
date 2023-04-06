@@ -19,7 +19,7 @@ template <typename T, const int M_chunk_size, const int N_chunk_size,
 __global__ void __launch_bounds__(NUM_THREADS)
     AffineTransformKernel(const T *__restrict__ A, const T *__restrict__ B,
                           const T *__restrict__ bias, T *C, const uint32_t M,
-                          const uint32_t N, const uint32_t K) {
+                          const uint32_t N, const uint32_t K, bool use_relu) {
 
     __shared__ T A_chunk[N_chunk_size][M_chunk_size + 1];
     __shared__ T B_chunk[N_chunk_size][K_chunk_size + 1];
@@ -148,12 +148,15 @@ __global__ void __launch_bounds__(NUM_THREADS)
                         (blockIdx.y * K_chunk_size) + current_result_col_in_C;
 
                     if (current_result_row < M && current_result_col < K) {
+                        auto res = results_per_thread[M_warp_subtile_iter]
+                                                     [K_warp_subtile_iter]
+                                                     [result_row_offset]
+                                                     [result_col_offset] +
+                                   bias[current_result_col];
+                        auto res_after_activation =
+                            (use_relu) ? std::max(res, (T)0) : res;
                         C[current_result_row * K + current_result_col] =
-                            results_per_thread[M_warp_subtile_iter]
-                                              [K_warp_subtile_iter]
-                                              [result_row_offset]
-                                              [result_col_offset] +
-                            bias[current_result_col];
+                            res_after_activation;
                     }
                 }
             }
@@ -163,7 +166,8 @@ __global__ void __launch_bounds__(NUM_THREADS)
 
 template <typename T>
 void InvokeAffineTransformation(T *A, T *B, T *bias, T *C, const uint32_t M,
-                                const uint32_t N, const uint32_t K) {
+                                const uint32_t N, const uint32_t K,
+                                bool use_relu) {
 
     const int M_chunk_size = 128;
     const int N_chunk_size = 32;
@@ -199,19 +203,20 @@ void InvokeAffineTransformation(T *A, T *B, T *bias, T *C, const uint32_t M,
                           M_warp_subtile_iters, K_warp_subtile_iters,
                           M_warp_subtile_size, K_warp_subtile_size,
                           result_tile_rows, result_tile_cols, threads>
-        <<<gridDim, blockDim>>>(A, B, bias, C, M, N, K);
+        <<<gridDim, blockDim>>>(A, B, bias, C, M, N, K, use_relu);
     // CHECK_LAST_CUDA_ERROR();
 }
 
 template void InvokeAffineTransformation<int>(int *A, int *B, int *bias, int *C,
                                               const uint32_t M,
                                               const uint32_t N,
-                                              const uint32_t K);
+                                              const uint32_t K, bool use_relu);
 
 template void InvokeAffineTransformation<float>(float *A, float *B, float *bias,
                                                 float *C, const uint32_t M,
                                                 const uint32_t N,
-                                                const uint32_t K);
+                                                const uint32_t K,
+                                                bool use_relu);
 
 }  // namespace ops
 }  // namespace optimus

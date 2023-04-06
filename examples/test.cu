@@ -4,6 +4,7 @@
 #include "optimus/kernels/ops/gemm.h"
 #include "optimus/kernels/ops/affine_transform.h"
 #include "optimus/utils/memanager.h"
+#include "optimus/layers/dense.h"
 
 using namespace optimus;
 
@@ -98,6 +99,9 @@ void test_affine_transform() {
 }
 
 int main() {
-    test_affine_transform();
+    auto layer = new optimus::layers::Dense<float>(32, 64, optimus::MEMORY_GPU);
+    
+    delete layer;
+    // test_affine_transform();
     return 0;
 }

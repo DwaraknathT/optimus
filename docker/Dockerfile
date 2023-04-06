@@ -4,7 +4,8 @@
 
 ARG DOCKER_VERSION=22.09
 # Use a base image with cuda 12.0
-ARG BASE_IMAGE=nvcr.io/nvidia/cuda:12.0.1-devel-ubuntu20.04
+ARG BASE_IMAGE=nvcr.io/nvidia/cuda:12.0.1-cudnn8-devel-ubuntu20.04
+
 FROM ${BASE_IMAGE}
 
 ENV DEBIAN_FRONTEND noninteractive
