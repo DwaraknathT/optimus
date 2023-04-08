@@ -5,6 +5,7 @@
 #include "optimus/kernels/ops/affine_transform.h"
 #include "optimus/utils/memanager.h"
 #include "optimus/layers/dense.h"
+#include "optimus/tensor.h"
 
 using namespace optimus;
 
@@ -99,9 +100,13 @@ void test_affine_transform() {
 }
 
 int main() {
-    auto layer = new optimus::layers::Dense<float>(32, 64, optimus::MEMORY_GPU);
-    
-    delete layer;
+    auto a = optimus::Tensor<int>({32, 1024, 512});
+    auto stride = a.stride();
+    for (int i : stride) {
+        std::cout << i << " ";
+    }
+    // auto layer = new optimus::layers::Dense<float>(32, 64, optimus::MEMORY_GPU);
+    // delete layer;
     // test_affine_transform();
     return 0;
 }
