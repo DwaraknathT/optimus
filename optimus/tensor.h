@@ -8,7 +8,7 @@ namespace optimus {
 
 template <typename T>
 class Tensor {
-   private:
+   public:
     T* data_;
     std::vector<int> shape_;
     std::vector<int> stride_;
@@ -30,19 +30,62 @@ class Tensor {
         for (int i = shape_.size() - 2; i >= 0; i--) {
             stride_[i] = stride_[i + 1] * shape_[i + 1];
         }
-        // // Allocate mem for tensor
-        // switch (memory_type) {
-        //     case MemoryType::MEMORY_CPU:
-        //         data_ = new T[size_];
-        //         break;
-        //     case MemoryType::MEMORY_CPU_PINNED:
-        //         break;
-        //     case MemoryType::MEMORY_GPU:
-        //         break;
-        // }
+        // Allocate mem for tensor
+        switch (memory_type) {
+            case MemoryType::MEMORY_CPU:
+                data_ = new T[size_]{};
+                break;
+            case MemoryType::MEMORY_CPU_PINNED:
+                cudaMallocHost((T**)&data_, size_);
+                memset(data_, 0, size_);
+                break;
+            case MemoryType::MEMORY_GPU:
+                cudaMalloc((T**)&data_, size_);
+                cudaMemset(data_, 0, size_);
+                break;
+        }
     }
 
-    ~Tensor() {}
+    ~Tensor() {
+        switch (memory_type_) {
+            case MemoryType::MEMORY_CPU:
+                delete[] data_;
+                break;
+            case MemoryType::MEMORY_CPU_PINNED:
+                cudaFreeHost(data_);
+                break;
+            case MemoryType::MEMORY_GPU:
+                cudaFree(data_);
+                break;
+        }
+    }
+
+    void copy_data(const T* src_data_ptr) {
+        switch (memory_type_) {
+            case MemoryType::MEMORY_CPU:
+                memcpy(data_, src_data_ptr, size_);
+                break;
+            case MemoryType::MEMORY_CPU_PINNED:
+                memcpy(data_, src_data_ptr, size_);
+                break;
+            case MemoryType::MEMORY_GPU:
+                cudaMemcpy((void*)data_, (void*)src_data_ptr, size_,
+                           cudaMemcpyHostToDevice);
+                break;
+        }
+    }
+
+    T& operator[](const std::vector<int>& index) {
+        int offset = 0;
+        for (size_t i = 0; i < shape_.size(); i++) {
+            offset += index[i] * stride_[i];
+        }
+        return data_[offset];
+    }
+
+    T& operator[](std::initializer_list<int> index) {
+        return operator[](std::vector<int>(index));
+    }
 
     std::vector<int> shape() { return shape_; }
 
