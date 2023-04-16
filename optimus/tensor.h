@@ -1,97 +1,98 @@
 #pragma once
-
+#include <iostream>
 #include <numeric>
-#include <vector>
+#include "cuda_runtime.h"
+#include "optimus/utils/cuda_utils.h"
 #include "optimus/utils/memanager.h"
 
 namespace optimus {
 
 template <typename T>
-class Tensor {
-   public:
-    T* data_;
-    std::vector<int> shape_;
-    std::vector<int> stride_;
-    const size_t size_;
-    const int ndim_;
-    const MemoryType memory_type_;
+struct Tensor {
+    T* data;
+    int* shape_;
+    int* stride_;
 
-   public:
-    Tensor(std::vector<int> shape,
-           MemoryType memory_type = MemoryType::MEMORY_CPU)
-        : shape_(shape),
-          ndim_(shape.size()),
+    int ndim_;
+    int size_;
+    int n_elements_;
+    MemoryType memory_type_;
+
+    Tensor(const std::initializer_list<int>& shape,
+           const MemoryType memory_type = MemoryType::MEMORY_CPU)
+        : ndim_(shape.size()),
           memory_type_(memory_type),
-          size_(sizeof(T) * std::accumulate(shape.begin(), shape.end(), 1,
-                                            std::multiplies<int>())) {
-        // Set stride
-        stride_.resize(shape_.size());
-        stride_[shape_.size() - 1] = 1;
-        for (int i = shape_.size() - 2; i >= 0; i--) {
-            stride_[i] = stride_[i + 1] * shape_[i + 1];
-        }
-        // Allocate mem for tensor
-        switch (memory_type) {
-            case MemoryType::MEMORY_CPU:
-                data_ = new T[size_]{};
-                break;
-            case MemoryType::MEMORY_CPU_PINNED:
-                cudaMallocHost((T**)&data_, size_);
-                memset(data_, 0, size_);
-                break;
-            case MemoryType::MEMORY_GPU:
-                cudaMalloc((T**)&data_, size_);
-                cudaMemset(data_, 0, size_);
-                break;
+          n_elements_(std::accumulate(shape.begin(), shape.end(), 1,
+                                      std::multiplies<int>())) {
+        size_ = sizeof(T) * n_elements_;
+
+        if (memory_type_ == MemoryType::MEMORY_CPU) {
+            data = (T*)malloc(size_);
+
+            shape_ = (int*)malloc(sizeof(int) * ndim_);
+            memcpy(shape_, shape.begin(), sizeof(int) * ndim_);
+
+            stride_ = (int*)malloc(sizeof(int) * ndim_);
+            stride_[ndim_ - 1] = 1;
+            for (int i = ndim_ - 2; i >= 0; i--) {
+                stride_[i] = stride_[i + 1] * shape_[i + 1];
+            }
+
+        } else if (memory_type_ == MemoryType::MEMORY_GPU) {
+            cudaMallocHost((void**)&data, size_);
+
+            int shape_buffer[ndim_];
+            memcpy((void*)shape_buffer, (void*)shape.begin(),
+                   sizeof(int) * ndim_);
+            cudaMallocHost((void**)&shape_, sizeof(int) * ndim_);
+            cudaMemcpy((void*)shape_, (void*)shape_buffer, sizeof(int) * ndim_,
+                       cudaMemcpyHostToDevice);
+
+            int stride_buffer[ndim_];
+            stride_buffer[ndim_ - 1] = 1;
+            for (int i = ndim_ - 2; i >= 0; i--) {
+                stride_buffer[i] = stride_buffer[i + 1] * shape_buffer[i + 1];
+            }
+            cudaMallocHost((void**)&stride_, sizeof(int) * shape.size());
+            cudaMemcpy((void*)stride_, (void*)stride_buffer,
+                       sizeof(int) * ndim_, cudaMemcpyHostToDevice);
         }
     }
 
     ~Tensor() {
-        switch (memory_type_) {
-            case MemoryType::MEMORY_CPU:
-                delete[] data_;
-                break;
-            case MemoryType::MEMORY_CPU_PINNED:
-                cudaFreeHost(data_);
-                break;
-            case MemoryType::MEMORY_GPU:
-                cudaFree(data_);
-                break;
+        if (memory_type_ == MemoryType::MEMORY_CPU) {
+            free(data);
+            free(shape_);
+            free(stride_);
+        } else if (memory_type_ == MemoryType::MEMORY_GPU) {
+            cudaFree(data);
+            cudaFreeHost(shape_);
+            cudaFreeHost(stride_);
         }
     }
 
-    void copy_data(const T* src_data_ptr) {
-        switch (memory_type_) {
-            case MemoryType::MEMORY_CPU:
-                memcpy(data_, src_data_ptr, size_);
-                break;
-            case MemoryType::MEMORY_CPU_PINNED:
-                memcpy(data_, src_data_ptr, size_);
-                break;
-            case MemoryType::MEMORY_GPU:
-                cudaMemcpy((void*)data_, (void*)src_data_ptr, size_,
-                           cudaMemcpyHostToDevice);
-                break;
-        }
-    }
-
-    T& operator[](const std::vector<int>& index) {
+    __device__ __host__ int getOffset(const std::initializer_list<int>& index) {
         int offset = 0;
-        for (size_t i = 0; i < shape_.size(); i++) {
-            offset += index[i] * stride_[i];
+        int i = 0;
+        for (auto it = index.begin(); it != index.end(); ++it) {
+            offset += (*it) * stride_[i++];
         }
-        return data_[offset];
+        return offset;
     }
 
-    T& operator[](std::initializer_list<int> index) {
-        return operator[](std::vector<int>(index));
+    __device__ __host__ T get(const std::initializer_list<int>& index) {
+        return data[getOffset(index)];
     }
 
-    std::vector<int> shape() { return shape_; }
+    __device__ __host__ void set(const std::initializer_list<int>& index,
+                                 T val) {
+        data[getOffset(index)] = val;
+    }
 
-    size_t size() { return size_; }
-
-    std::vector<int> stride() { return stride_; }
+    __device__ __host__ void set(T* src_data_) {
+        cudaMemcpy((void*)data, (void*)src_data_, size_,
+                   cudaMemcpyHostToDevice);
+    }
 };
 
 }  // namespace optimus
