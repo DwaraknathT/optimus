@@ -4,6 +4,14 @@
 
 namespace optimus {
 
+template <typename T>
+void print_vector(const std::vector<T>& v) {
+    for (const auto& i : v) {
+        std::cout << i << ' ';
+    }
+    std::cout << std::endl;
+}
+
 /*
 Checks the broadcast-ability of two tensor shapes a and b.
 We can boil down the rules to check if we can broadcast between two shapes

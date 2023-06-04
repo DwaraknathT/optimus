@@ -35,7 +35,20 @@ class Tensor : public MemoryManaged {
     MemoryType memory_type_;
 
    public:
+    // The setShape function definition
+    template <typename InputIt>
+    void setShape(InputIt shape_begin, InputIt shape_end) {
+        CHECK_CUDA_ERROR(
+            cudaMallocManaged((void**)&shape_, sizeof(int) * ndim_));
+        std::vector<int> temp_shape(shape_begin, shape_end);
+        memcpy(shape_, temp_shape.data(), sizeof(int) * ndim_);
+    }
+
     Tensor(const std::initializer_list<int>& shape,
+           const MemoryType memory_type = MemoryType::MEMORY_CPU)
+        : Tensor(std::vector<int>(shape), memory_type) {}
+
+    Tensor(const std::vector<int>& shape,
            const MemoryType memory_type = MemoryType::MEMORY_CPU)
         : ndim_(shape.size()),
           memory_type_(memory_type),
@@ -43,9 +56,8 @@ class Tensor : public MemoryManaged {
                                       std::multiplies<int>())) {
         size_ = sizeof(T) * n_elements_;
 
-        CHECK_CUDA_ERROR(
-            cudaMallocManaged((void**)&shape_, sizeof(int) * ndim_));
-        memcpy((void*)shape_, (void*)shape.begin(), sizeof(int) * ndim_);
+        // Set the shape in cuda managed memory.
+        setShape(shape.begin(), shape.end());
 
         CHECK_CUDA_ERROR(
             cudaMallocManaged((void**)&stride_, sizeof(int) * ndim_));
@@ -90,7 +102,7 @@ class Tensor : public MemoryManaged {
         data[getOffset(index)] = val;
     }
 
-    __device__ __host__ void set(T* src_data_) {
+    __host__ void set(const T* src_data_) {
         if (memory_type_ == MemoryType::MEMORY_CPU) {
             memcpy((void*)data, (void*)src_data_, size_);
         } else if (memory_type_ == MemoryType::MEMORY_GPU) {
