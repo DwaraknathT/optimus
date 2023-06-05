@@ -1,6 +1,8 @@
 #pragma once
+
 #include <iostream>
 #include <numeric>
+#include <vector>
 #include "cuda_runtime.h"
 #include "optimus/utils/cuda_utils.h"
 #include "optimus/utils/memanager.h"
@@ -41,7 +43,7 @@ class Tensor : public MemoryManaged {
         CHECK_CUDA_ERROR(
             cudaMallocManaged((void**)&shape_, sizeof(int) * ndim_));
         std::vector<int> temp_shape(shape_begin, shape_end);
-        memcpy(shape_, temp_shape.data(), sizeof(int) * ndim_);
+        std::copy(temp_shape.begin(), temp_shape.end(), shape_);
     }
 
     Tensor(const std::initializer_list<int>& shape,
@@ -104,7 +106,7 @@ class Tensor : public MemoryManaged {
 
     __host__ void set(const T* src_data_) {
         if (memory_type_ == MemoryType::MEMORY_CPU) {
-            memcpy((void*)data, (void*)src_data_, size_);
+            std::copy(src_data_, src_data_ + size_ / sizeof(T), data);
         } else if (memory_type_ == MemoryType::MEMORY_GPU) {
             CHECK_CUDA_ERROR(cudaMemcpy((void*)data, (void*)src_data_, size_,
                                         cudaMemcpyHostToDevice));
