@@ -11,5 +11,27 @@ docker compose build
 ```
 Then start the docker container in interactive mode with bash
 ```
-sudo nvidia-docker run --cap-add=SYS_ADMIN -v ~/.ssh:/root/.ssh:Z -v ~/optimus/:/workspace/host/optimus --ipc=host -ti optimus:dev bash
+docker compose run optimus bash
+```
+
+## Building Optimus 
+
+Once you start the docker container, you will be put in `/workspace/host/optimus` by default. 
+Do the following to genrate the make files.
+
+```
+mkdir build && cd build 
+cmake ..
+```
+
+Now build Optimus with 
+```
+make all
+```
+
+## Running Tests
+
+Run any python unit test individually, for example to test the matmul op
+```
+python3 /workspace/host/optimus/tests/ops/test_matmul.py
 ```
