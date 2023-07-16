@@ -1,29 +1,26 @@
 #pragma once
+
 #include <iostream>
 #include <numeric>
+#include <vector>
 #include "cuda_runtime.h"
 #include "optimus/utils/cuda_utils.h"
 #include "optimus/utils/memanager.h"
 
 namespace optimus {
 
-class MemoryManaged {
-   public:
-    void* operator new(size_t len) {
-        void* ptr;
-        CHECK_CUDA_ERROR(cudaMallocManaged(&ptr, len));
-        CHECK_CUDA_ERROR(cudaDeviceSynchronize());
-        return ptr;
+__device__ __host__ int getOffset(const std::initializer_list<int>& index,
+                                  const int* stride) {
+    int offset = 0;
+    int i = 0;
+    for (auto it = index.begin(); it != index.end(); ++it) {
+        offset += (*it) * stride[i++];
     }
-
-    void operator delete(void* ptr) {
-        CHECK_CUDA_ERROR(cudaDeviceSynchronize());
-        CHECK_CUDA_ERROR(cudaFree(ptr));
-    }
-};
+    return offset;
+}
 
 template <typename T>
-class Tensor : public MemoryManaged {
+class Tensor {
    public:
     T* data;
     int* shape_;
@@ -35,7 +32,36 @@ class Tensor : public MemoryManaged {
     MemoryType memory_type_;
 
    public:
+    // The setShape function definition
+    template <typename InputIt>
+    void setShape(InputIt shape_begin, InputIt shape_end) {
+        CHECK_CUDA_ERROR(
+            cudaMallocManaged((void**)&shape_, sizeof(int) * ndim_));
+        std::vector<int> temp_shape(shape_begin, shape_end);
+        std::copy(temp_shape.begin(), temp_shape.end(), shape_);
+    }
+
+    void allocateMemory(MemoryType memory_type) {
+        if (memory_type == MemoryType::MEMORY_CPU) {
+            data = (T*)malloc(size_);
+        } else if (memory_type == MemoryType::MEMORY_GPU) {
+            CHECK_CUDA_ERROR(cudaMalloc((void**)&data, size_));
+        }
+    }
+
+    void freeMemory(MemoryType memory_type) {
+        if (memory_type == MemoryType::MEMORY_CPU) {
+            free(data);
+        } else if (memory_type == MemoryType::MEMORY_GPU) {
+            CHECK_CUDA_ERROR(cudaFree(data));
+        }
+    }
+
     Tensor(const std::initializer_list<int>& shape,
+           const MemoryType memory_type = MemoryType::MEMORY_CPU)
+        : Tensor(std::vector<int>(shape), memory_type) {}
+
+    Tensor(const std::vector<int>& shape,
            const MemoryType memory_type = MemoryType::MEMORY_CPU)
         : ndim_(shape.size()),
           memory_type_(memory_type),
@@ -43,9 +69,8 @@ class Tensor : public MemoryManaged {
                                       std::multiplies<int>())) {
         size_ = sizeof(T) * n_elements_;
 
-        CHECK_CUDA_ERROR(
-            cudaMallocManaged((void**)&shape_, sizeof(int) * ndim_));
-        memcpy((void*)shape_, (void*)shape.begin(), sizeof(int) * ndim_);
+        // Set the shape in cuda managed memory.
+        setShape(shape.begin(), shape.end());
 
         CHECK_CUDA_ERROR(
             cudaMallocManaged((void**)&stride_, sizeof(int) * ndim_));
@@ -54,45 +79,47 @@ class Tensor : public MemoryManaged {
             stride_[i] = stride_[i + 1] * shape_[i + 1];
         }
 
-        if (memory_type_ == MemoryType::MEMORY_CPU) {
-            data = (T*)malloc(size_);
-        } else if (memory_type_ == MemoryType::MEMORY_GPU) {
-            CHECK_CUDA_ERROR(cudaMallocHost((void**)&data, size_));
-        }
+        allocateMemory(memory_type_);
     }
 
     ~Tensor() {
-        if (memory_type_ == MemoryType::MEMORY_CPU) {
-            free(data);
-        } else if (memory_type_ == MemoryType::MEMORY_GPU) {
-            CHECK_CUDA_ERROR(cudaFree(data));
-        }
-
+        freeMemory(memory_type_);
         CHECK_CUDA_ERROR(cudaFree(shape_));
         CHECK_CUDA_ERROR(cudaFree(stride_));
     }
 
-    __device__ __host__ int getOffset(const std::initializer_list<int>& index) {
-        int offset = 0;
-        int i = 0;
-        for (auto it = index.begin(); it != index.end(); ++it) {
-            offset += (*it) * stride_[i++];
+    void to(MemoryType target_memory_type) {
+        if (target_memory_type != memory_type_) {
+            T* new_data;
+
+            if (target_memory_type == MemoryType::MEMORY_CPU) {
+                new_data = (T*)malloc(size_);
+                CHECK_CUDA_ERROR(cudaMemcpy((void*)new_data, (void*)data, size_,
+                                            cudaMemcpyDeviceToHost));
+            } else if (target_memory_type == MemoryType::MEMORY_GPU) {
+                CHECK_CUDA_ERROR(cudaMalloc((void**)&new_data, size_));
+                CHECK_CUDA_ERROR(cudaMemcpy((void*)new_data, (void*)data, size_,
+                                            cudaMemcpyHostToDevice));
+            }
+
+            freeMemory(memory_type_);
+            data = new_data;
+            memory_type_ = target_memory_type;
         }
-        return offset;
     }
 
-    __device__ __host__ T get(const std::initializer_list<int>& index) {
-        return data[getOffset(index)];
+    __device__ __host__ T get(const std::initializer_list<int>& index) const {
+        return data[getOffset(index, stride_)];
     }
 
     __device__ __host__ void set(const std::initializer_list<int>& index,
                                  T val) {
-        data[getOffset(index)] = val;
+        data[getOffset(index, stride_)] = val;
     }
 
-    __device__ __host__ void set(T* src_data_) {
+    __host__ void set(const T* src_data_) {
         if (memory_type_ == MemoryType::MEMORY_CPU) {
-            memcpy((void*)data, (void*)src_data_, size_);
+            std::copy(src_data_, src_data_ + size_ / sizeof(T), data);
         } else if (memory_type_ == MemoryType::MEMORY_GPU) {
             CHECK_CUDA_ERROR(cudaMemcpy((void*)data, (void*)src_data_, size_,
                                         cudaMemcpyHostToDevice));

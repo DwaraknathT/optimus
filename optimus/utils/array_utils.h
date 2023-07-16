@@ -4,6 +4,14 @@
 
 namespace optimus {
 
+template <typename T>
+void print_vector(const std::vector<T>& v) {
+    for (const auto& i : v) {
+        std::cout << i << ' ';
+    }
+    std::cout << std::endl;
+}
+
 /*
 Checks the broadcast-ability of two tensor shapes a and b.
 We can boil down the rules to check if we can broadcast between two shapes
@@ -20,9 +28,8 @@ to the following.
 
 */
 
-inline int div_ceil(int numerator, int denominator) {
-    std::div_t res = std::div(numerator, denominator);
-    return res.rem ? (res.quot + 1) : res.quot;
+constexpr int div_ceil(int numerator, int denominator) {
+    return (numerator + denominator - 1) / denominator;
 }
 
 }  // namespace optimus

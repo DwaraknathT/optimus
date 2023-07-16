@@ -20,4 +20,3 @@ opt_output = math.affine_transform(a, b, bias)
 print(np.sum(np.isclose(opt_output, ref_output, atol=1e-4)) / opt_output.size)
 
 assert np.allclose(opt_output, ref_output, atol=1e-4)
-

@@ -2,7 +2,6 @@
 #include <curand.h>
 #include <iostream>
 #include "optimus/ops/gemm.h"
-#include "optimus/utils/memanager.h"
 #include "optimus/tensor.h"
 
 using namespace optimus;
@@ -35,35 +34,23 @@ void gpu_blas_mmul(const float* A, const float* B, float* C, const int m,
 }
 
 void test_matmul() {
-    const uint32_t m = 32 * 2048;
+    const uint32_t m = 32*2048;
     const uint32_t n = 1024;
-    const uint32_t k = 1024 * 3;
-    const size_t size_a = sizeof(float) * m * n;
-    const size_t size_b = sizeof(float) * n * k;
-    const size_t size_c = sizeof(float) * m * k;
+    const uint32_t k = 1024*3;
     const float alpha = 1.0;
     const float beta = 0;
 
-    auto memory_manager = new optimus::MemManager();
-    float* h_c =
-        (float*)(memory_manager->allocate(size_c, optimus::MEMORY_CPU));
-
-    float* d_a =
-        (float*)(memory_manager->allocate(size_a, optimus::MEMORY_GPU));
-    float* d_b =
-        (float*)(memory_manager->allocate(size_b, optimus::MEMORY_GPU));
-    float* d_c =
-        (float*)(memory_manager->allocate(size_c, optimus::MEMORY_GPU));
+    auto A_tensor = new optimus::Tensor<float>({m, n}, optimus::MEMORY_GPU);
+    auto B_tensor = new optimus::Tensor<float>({n, k}, optimus::MEMORY_GPU);
+    auto C_tensor = new optimus::Tensor<float>({m, k}, optimus::MEMORY_GPU);
         
-    GPU_fill_rand(d_a, m, n);
-    GPU_fill_rand(d_b, n, k);
+    GPU_fill_rand(A_tensor->data, m, n);
+    GPU_fill_rand(B_tensor->data, n, k);
 
-    optimus::ops::InvokeGeMM<float>(d_a, d_b, d_c, m, n, k, alpha, beta);
-    gpu_blas_mmul(d_a, d_b, d_c, m, n, k);
-
-    cudaMemcpy(d_c, h_c, size_c, cudaMemcpyDeviceToHost);
-    delete memory_manager;
+    optimus::ops::InvokeGeMM<float>(A_tensor, B_tensor, C_tensor, alpha, beta);
+    gpu_blas_mmul(A_tensor->data, B_tensor->data, C_tensor->data, m, n, k);
 }
+
 
 int main() {
     test_matmul();

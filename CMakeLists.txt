@@ -100,12 +100,15 @@ link_directories(
 )
 
 add_subdirectory(optimus)
+add_subdirectory(tests)
+add_subdirectory(profiles)
 add_subdirectory(examples)
 
 ###########################################################
 
 add_library(optimus SHARED 
     $<TARGET_OBJECTS:memanager>
+    $<TARGET_OBJECTS:cuda_utils>
     $<TARGET_OBJECTS:log_utils>
     $<TARGET_OBJECTS:gemm>
 )

@@ -17,9 +17,9 @@ template <typename T, const int M_chunk_size, const int N_chunk_size,
           const int K_warp_subtile_size, const int result_tile_rows,
           const int result_tile_cols, const int NUM_THREADS>
 __global__ void __launch_bounds__(NUM_THREADS)
-    FP32_GeMM(const T *__restrict__ A, const T *__restrict__ B, T *C,
-               const uint32_t M, const uint32_t N, const uint32_t K,
-               const float alpha, const float beta) {
+    FP32_GeMM_Kernel(const T *__restrict__ A, const T *__restrict__ B, T *C,
+                     const uint32_t M, const uint32_t N, const uint32_t K,
+                     const float alpha, const float beta) {
 
     __shared__ T A_chunk[N_chunk_size][M_chunk_size + 1];
     __shared__ T B_chunk[N_chunk_size][K_chunk_size + 1];
