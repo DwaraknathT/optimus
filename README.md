@@ -34,5 +34,4 @@ make all
 Run any python unit test individually, for example to test the matmul op
 ```
 python3 /workspace/host/optimus/tests/ops/test_matmul.py
-
 ```

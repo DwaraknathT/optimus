@@ -35,7 +35,4 @@ print('Optimus Standard deviation:', opt_stdev_time)
 
 print(np.sum(np.isclose(opt_output, ref_output, atol=1e-4)) / opt_output.size)
 
-print(ref_output)
-print(opt_output)
-
 assert np.allclose(opt_output, ref_output, atol=1e-4)

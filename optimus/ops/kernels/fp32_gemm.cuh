@@ -1,4 +1,3 @@
-#include <cooperative_groups.h>
 #include <cmath>
 #include <iostream>
 #include "optimus/ops/kernels/smem_load.cuh"
@@ -6,9 +5,8 @@
 #include "optimus/utils/cuda_utils.h"
 
 namespace optimus {
+// A nested namespace for all the core math ops
 namespace ops {
-
-namespace cg = cooperative_groups;
 
 #define WARP_SIZE 32
 
@@ -26,11 +24,6 @@ __global__ void __launch_bounds__(NUM_THREADS)
     __shared__ T A_chunk[N_chunk_size][M_chunk_size + 1];
     __shared__ T B_chunk[N_chunk_size][K_chunk_size + 1];
 
-    register T results_per_thread[M_warp_subtile_iters][K_warp_subtile_iters]
-                                 [result_tile_rows][result_tile_cols] = {0};
-
-    cg::thread_block thread_block = cg::this_thread_block();
-
     const int warp_id = threadIdx.x / WARP_SIZE;
     const int warp_row = warp_id / (K_chunk_size / K_warp_tile_size);
     const int warp_col = warp_id % (K_chunk_size / K_warp_tile_size);
@@ -42,19 +35,22 @@ __global__ void __launch_bounds__(NUM_THREADS)
     const int thread_row_in_warp = thread_id_in_warp / warp_thread_cols;
     const int thread_col_in_warp = thread_id_in_warp % warp_thread_cols;
 
+    register T results_per_thread[M_warp_subtile_iters][K_warp_subtile_iters]
+                                 [result_tile_rows][result_tile_cols] = {0};
+
     for (int chunk_idx = 0; chunk_idx < (((N - 1) / N_chunk_size) + 1);
          chunk_idx++) {
 
-        // if (M % 4 == 0 && N % 4 == 0 && K % 4 == 0) {
-        //     Float4VectorizedSMeMLoad<T, M_chunk_size, N_chunk_size,
-        //                              K_chunk_size>(A, B, A_chunk, B_chunk,
-        //                                            chunk_idx, M, N, K);
-        // } else {
-        NonVectorizedSMeMLoad<T, M_chunk_size, N_chunk_size, K_chunk_size>(
-            A, B, A_chunk, B_chunk, chunk_idx, M, N, K);
-        // }
+        if (M % 4 == 0 && N % 4 == 0 && K % 4 == 0) {
+            Float4VectorizedSMeMLoad<T, M_chunk_size, N_chunk_size,
+                                     K_chunk_size>(A, B, A_chunk, B_chunk,
+                                                   chunk_idx, M, N, K);
+        } else {
+            NonVectorizedSMeMLoad<T, M_chunk_size, N_chunk_size, K_chunk_size>(
+                A, B, A_chunk, B_chunk, chunk_idx, M, N, K);
+        }
 
-        thread_block.sync();
+        __syncthreads();
 
 #pragma unroll
         for (int inner_dim = 0; inner_dim < N_chunk_size; inner_dim++) {
@@ -109,7 +105,7 @@ __global__ void __launch_bounds__(NUM_THREADS)
             }
         }
 
-        thread_block.sync();
+        __syncthreads();
     }
 
 #pragma unroll
@@ -152,12 +148,11 @@ __global__ void __launch_bounds__(NUM_THREADS)
                         (blockIdx.y * K_chunk_size) + current_result_col_in_C;
 
                     if (current_result_row < M && current_result_col < K) {
-                        auto result = results_per_thread[M_warp_subtile_iter]
-                                                        [K_warp_subtile_iter]
-                                                        [result_row_offset]
-                                                        [result_col_offset];
-                        C->set({current_result_row, current_result_col},
-                               result);
+                        C[current_result_row * K + current_result_col] =
+                            results_per_thread[M_warp_subtile_iter]
+                                              [K_warp_subtile_iter]
+                                              [result_row_offset]
+                                              [result_col_offset];
                     }
                 }
             }

@@ -3,9 +3,6 @@
 #include <iostream>
 #include <numeric>
 #include "cuda_runtime.h"
-#include "optimus/kernels/ops/affine_transform.h"
-#include "optimus/kernels/ops/gemm.h"
-#include "optimus/layers/dense.h"
 #include "optimus/tensor.h"
 #include "optimus/utils/cuda_utils.h"
 
