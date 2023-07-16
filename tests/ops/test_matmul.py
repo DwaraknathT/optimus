@@ -1,7 +1,6 @@
 import time
 import statistics
 import numpy as np 
-import jax.numpy as jnp 
 from pyoptimus import math 
 
 m = 32*2048
@@ -26,7 +25,7 @@ def get_exection_time(func, a, b):
 
     return output, mean_time, stdev_time
 
-ref_output, ref_mean_time, ref_stdev_time = get_exection_time(jnp.matmul, a, b)
+ref_output, ref_mean_time, ref_stdev_time = get_exection_time(np.matmul, a, b)
 print('Reference Mean execution time:', ref_mean_time)
 print('Reference Standard deviation:', ref_stdev_time)
 
