@@ -44,7 +44,7 @@ void InvokeGeMM(T *A, T *B, T *C, const uint32_t M, const uint32_t N,
     dim3 blockDim(threads);
 
     // Launch the kernel
-    GeMMKernel<T, M_chunk_size, N_chunk_size, K_chunk_size, M_warp_tile_size,
+    FP32_GeMM<T, M_chunk_size, N_chunk_size, K_chunk_size, M_warp_tile_size,
                K_warp_tile_size, M_warp_subtile_iters, K_warp_subtile_iters,
                M_warp_subtile_size, K_warp_subtile_size, result_tile_rows,
                result_tile_cols, threads>
