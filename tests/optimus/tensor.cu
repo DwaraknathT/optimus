@@ -1,5 +1,3 @@
-#include <cublas_v2.h>
-#include <curand.h>
 #include <iostream>
 #include <numeric>
 #include "cuda_runtime.h"

@@ -100,6 +100,7 @@ link_directories(
 )
 
 add_subdirectory(optimus)
+add_subdirectory(tests)
 add_subdirectory(examples)
 
 ###########################################################
