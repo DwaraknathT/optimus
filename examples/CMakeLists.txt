@@ -1,7 +1,3 @@
 add_executable(test test.cu)
-target_link_libraries(test PUBLIC memanager cuda_utils gemm_kernels affine_transforms dense_layer)
+target_link_libraries(test PUBLIC memanager gemm)
 target_link_libraries(test PUBLIC -lcublas -lcublasLt -lcudart -lcurand)
-
-add_executable(profile profile.cu)
-target_link_libraries(profile PUBLIC cuda_utils gemm_kernels affine_transforms dense_layer)
-target_link_libraries(profile PUBLIC -lcublas -lcublasLt -lcudart -lcurand)

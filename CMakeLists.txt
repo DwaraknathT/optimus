@@ -108,10 +108,7 @@ add_library(optimus SHARED
     $<TARGET_OBJECTS:memanager>
     $<TARGET_OBJECTS:cuda_utils>
     $<TARGET_OBJECTS:log_utils>
-    $<TARGET_OBJECTS:gemm_kernels>
-    $<TARGET_OBJECTS:affine_transforms>
-    $<TARGET_OBJECTS:arithmetic_kernels>
-    $<TARGET_OBJECTS:dense_layer>
+    $<TARGET_OBJECTS:gemm>
 )
 set_property(TARGET optimus PROPERTY POSITION_INDEPENDENT_CODE ON)
 set_property(TARGET optimus PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
