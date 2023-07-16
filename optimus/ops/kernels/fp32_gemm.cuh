@@ -1,6 +1,6 @@
 #include <cmath>
 #include <iostream>
-#include "optimus/ops/kernels/smem_load.cuh"
+#include "optimus/ops/kernels/fp32_smem_load.cuh"
 #include "optimus/utils/array_utils.h"
 #include "optimus/utils/cuda_utils.h"
 
@@ -42,12 +42,17 @@ __global__ void __launch_bounds__(NUM_THREADS)
          chunk_idx++) {
 
         if (M % 4 == 0 && N % 4 == 0 && K % 4 == 0) {
-            Float4VectorizedSMeMLoad<T, M_chunk_size, N_chunk_size,
-                                     K_chunk_size>(A, B, A_chunk, B_chunk,
-                                                   chunk_idx, M, N, K);
+            FP32Float4VectorizedSMeMLoad<T, M_chunk_size, N_chunk_size,
+                                         K_chunk_size>(A, B, A_chunk, B_chunk,
+                                                       chunk_idx, M, N, K);
+        } else if (M % 2 == 0 && N % 2 == 0 && K % 2 == 0) {
+            FP32Float2VectorizedSMeMLoad<T, M_chunk_size, N_chunk_size,
+                                         K_chunk_size>(A, B, A_chunk, B_chunk,
+                                                       chunk_idx, M, N, K);
         } else {
-            NonVectorizedSMeMLoad<T, M_chunk_size, N_chunk_size, K_chunk_size>(
-                A, B, A_chunk, B_chunk, chunk_idx, M, N, K);
+            FP32NonVectorizedSMeMLoad<T, M_chunk_size, N_chunk_size,
+                                      K_chunk_size>(A, B, A_chunk, B_chunk,
+                                                    chunk_idx, M, N, K);
         }
 
         __syncthreads();
