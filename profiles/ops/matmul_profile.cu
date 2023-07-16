@@ -1,11 +1,7 @@
 #include <cublas_v2.h>
 #include <curand.h>
 #include <iostream>
-
-#include "optimus/kernels/ops/gemm.h"
-#include "optimus/kernels/ops/affine_transform.h"
-#include "optimus/utils/memanager.h"
-#include "optimus/layers/dense.h"
+#include "optimus/ops/gemm.h"
 #include "optimus/tensor.h"
 
 using namespace optimus;
@@ -38,12 +34,9 @@ void gpu_blas_mmul(const float* A, const float* B, float* C, const int m,
 }
 
 void test_matmul() {
-    const uint32_t m = 8192;
-    const uint32_t n = 8192;
-    const uint32_t k = 8192;
-    const size_t size_a = sizeof(float) * m * n;
-    const size_t size_b = sizeof(float) * n * k;
-    const size_t size_c = sizeof(float) * m * k;
+    const uint32_t m = 32*2048;
+    const uint32_t n = 1024;
+    const uint32_t k = 1024*3;
     const float alpha = 1.0;
     const float beta = 0;
 
@@ -60,8 +53,6 @@ void test_matmul() {
 
 
 int main() {
-    // auto layer = new optimus::layers::Dense<float>(32, 64, optimus::MEMORY_GPU);
-    // delete layer;
     test_matmul();
     return 0;
 }
