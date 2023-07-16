@@ -86,7 +86,7 @@ class Tensor : public MemoryManaged {
         CHECK_CUDA_ERROR(cudaFree(stride_));
     }
 
-    __device__ __host__ int getOffset(const std::initializer_list<int>& index) {
+    __device__ __host__ int getOffset(const std::initializer_list<int>& index) const {
         int offset = 0;
         int i = 0;
         for (auto it = index.begin(); it != index.end(); ++it) {
@@ -95,7 +95,7 @@ class Tensor : public MemoryManaged {
         return offset;
     }
 
-    __device__ __host__ T get(const std::initializer_list<int>& index) {
+    __device__ __host__ T get(const std::initializer_list<int>& index) const {
         return data[getOffset(index)];
     }
 

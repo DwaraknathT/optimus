@@ -28,9 +28,8 @@ to the following.
 
 */
 
-inline int div_ceil(int numerator, int denominator) {
-    std::div_t res = std::div(numerator, denominator);
-    return res.rem ? (res.quot + 1) : res.quot;
+constexpr int div_ceil(int numerator, int denominator) {
+    return (numerator + denominator - 1) / denominator;
 }
 
 }  // namespace optimus

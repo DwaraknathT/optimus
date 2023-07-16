@@ -1,12 +1,13 @@
 #pragma once
 
+#include <optimus/tensor.h>
+
 namespace optimus {
 namespace ops {
 
 template <typename T>
-void InvokeAffineTransformation(T *A, T *B, T *bias, T *C, const uint32_t M,
-                                const uint32_t N, const uint32_t K,
-                                bool use_relu = false);
+void InvokeAffineTransformation(Tensor<T> *A, Tensor<T> *B, Tensor<T> *bias,
+                                Tensor<T> *C, bool use_relu = false);
 
 }  // namespace ops
 }  // namespace optimus

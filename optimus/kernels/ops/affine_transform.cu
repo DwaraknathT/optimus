@@ -1,12 +1,16 @@
+#include <cooperative_groups.h>
 #include <cmath>
 #include <iostream>
 #include "optimus/kernels/ops/affine_transform.h"
 #include "optimus/kernels/ops/gemm_utils.cuh"
+#include "optimus/tensor.h"
 #include "optimus/utils/array_utils.h"
-// #include "optimus/utils/cuda_utils.h"
+#include "optimus/utils/cuda_utils.h"
 
 namespace optimus {
 namespace ops {
+
+namespace cg = cooperative_groups;
 
 #define WARP_SIZE 32
 
@@ -17,12 +21,16 @@ template <typename T, const int M_chunk_size, const int N_chunk_size,
           const int K_warp_subtile_size, const int result_tile_rows,
           const int result_tile_cols, const int NUM_THREADS>
 __global__ void __launch_bounds__(NUM_THREADS)
-    AffineTransformKernel(const T *__restrict__ A, const T *__restrict__ B,
-                          const T *__restrict__ bias, T *C, const uint32_t M,
-                          const uint32_t N, const uint32_t K, bool use_relu) {
-
+    AffineTransformKernel(const Tensor<T> *__restrict__ A,
+                          const Tensor<T> *__restrict__ B,
+                          const Tensor<T> *__restrict__ bias, Tensor<T> *C,
+                          const uint32_t M, const uint32_t N, const uint32_t K,
+                          bool use_relu) {
     __shared__ T A_chunk[N_chunk_size][M_chunk_size + 1];
     __shared__ T B_chunk[N_chunk_size][K_chunk_size + 1];
+
+    register T results_per_thread[M_warp_subtile_iters][K_warp_subtile_iters]
+                                 [result_tile_rows][result_tile_cols] = {0};
 
     const int warp_id = threadIdx.x / WARP_SIZE;
     const int warp_row = warp_id / (K_chunk_size / K_warp_tile_size);
@@ -35,22 +43,21 @@ __global__ void __launch_bounds__(NUM_THREADS)
     const int thread_row_in_warp = thread_id_in_warp / warp_thread_cols;
     const int thread_col_in_warp = thread_id_in_warp % warp_thread_cols;
 
-    register T results_per_thread[M_warp_subtile_iters][K_warp_subtile_iters]
-                                 [result_tile_rows][result_tile_cols] = {0};
+    cg::thread_block thread_block = cg::this_thread_block();
 
     for (int chunk_idx = 0; chunk_idx < (((N - 1) / N_chunk_size) + 1);
          chunk_idx++) {
 
-        if (M % 4 == 0 && N % 4 == 0 && K % 4 == 0) {
-            Float4VectorizedSMeMLoad<T, M_chunk_size, N_chunk_size,
-                                     K_chunk_size>(A, B, A_chunk, B_chunk,
-                                                   chunk_idx, M, N, K);
-        } else {
-            NonVectorizedSMeMLoad<T, M_chunk_size, N_chunk_size, K_chunk_size>(
-                A, B, A_chunk, B_chunk, chunk_idx, M, N, K);
-        }
+        // if (M % 4 == 0 && N % 4 == 0 && K % 4 == 0) {
+        //     Float4VectorizedSMeMLoad<T, M_chunk_size, N_chunk_size,
+        //                              K_chunk_size>(A, B, A_chunk, B_chunk,
+        //                                            chunk_idx, M, N, K);
+        // } else {
+        NonVectorizedSMeMLoad<T, M_chunk_size, N_chunk_size, K_chunk_size>(
+            A, B, A_chunk, B_chunk, chunk_idx, M, N, K);
+        // }
 
-        __syncthreads();
+        thread_block.sync();
 
 #pragma unroll
         for (int inner_dim = 0; inner_dim < N_chunk_size; inner_dim++) {
@@ -105,7 +112,7 @@ __global__ void __launch_bounds__(NUM_THREADS)
             }
         }
 
-        __syncthreads();
+        thread_block.sync();
     }
 
 #pragma unroll
@@ -152,11 +159,12 @@ __global__ void __launch_bounds__(NUM_THREADS)
                                                      [K_warp_subtile_iter]
                                                      [result_row_offset]
                                                      [result_col_offset] +
-                                   bias[current_result_col];
+                                   bias->get({current_result_col});
                         auto res_after_activation =
-                            (use_relu) ? std::max(res, (T)0) : res;
-                        C[current_result_row * K + current_result_col] =
-                            res_after_activation;
+                            (use_relu) ? max(res, (T)0) : res;
+
+                        C->set({current_result_row, current_result_col},
+                               res_after_activation);
                     }
                 }
             }
@@ -165,9 +173,13 @@ __global__ void __launch_bounds__(NUM_THREADS)
 }
 
 template <typename T>
-void InvokeAffineTransformation(T *A, T *B, T *bias, T *C, const uint32_t M,
-                                const uint32_t N, const uint32_t K,
-                                bool use_relu) {
+void InvokeAffineTransformation(Tensor<T> *A, Tensor<T> *B, Tensor<T> *bias,
+                                Tensor<T> *C, bool use_relu) {
+
+    // A is (M, N) and B is (N, K)
+    const int M = A->shape_[0];
+    const int N = A->shape_[1];
+    const int K = B->shape_[1];
 
     const int M_chunk_size = 128;
     const int N_chunk_size = 32;
@@ -204,18 +216,17 @@ void InvokeAffineTransformation(T *A, T *B, T *bias, T *C, const uint32_t M,
                           M_warp_subtile_size, K_warp_subtile_size,
                           result_tile_rows, result_tile_cols, threads>
         <<<gridDim, blockDim>>>(A, B, bias, C, M, N, K, use_relu);
-    // CHECK_LAST_CUDA_ERROR();
+    CHECK_LAST_CUDA_ERROR();
 }
 
-template void InvokeAffineTransformation<int>(int *A, int *B, int *bias, int *C,
-                                              const uint32_t M,
-                                              const uint32_t N,
-                                              const uint32_t K, bool use_relu);
+template void InvokeAffineTransformation<int>(Tensor<int> *A, Tensor<int> *B,
+                                              Tensor<int> *bias, Tensor<int> *C,
+                                              bool use_relu);
 
-template void InvokeAffineTransformation<float>(float *A, float *B, float *bias,
-                                                float *C, const uint32_t M,
-                                                const uint32_t N,
-                                                const uint32_t K,
+template void InvokeAffineTransformation<float>(Tensor<float> *A,
+                                                Tensor<float> *B,
+                                                Tensor<float> *bias,
+                                                Tensor<float> *C,
                                                 bool use_relu);
 
 }  // namespace ops

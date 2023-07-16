@@ -1,11 +1,13 @@
 #pragma once
 
+#include "optimus/tensor.h"
+
 namespace optimus {
 namespace ops {
 template <typename T, const int M_chunk_size, const int N_chunk_size,
           const int K_chunk_size>
-__device__ void NonVectorizedSMeMLoad(const T *__restrict__ A,
-                                      const T *__restrict__ B,
+__device__ void NonVectorizedSMeMLoad(const Tensor<T> *__restrict__ A,
+                                      const Tensor<T> *__restrict__ B,
                                       T A_chunk[][M_chunk_size + 1],
                                       T B_chunk[][K_chunk_size + 1],
                                       const int chunk_idx, const int M,
@@ -26,9 +28,9 @@ __device__ void NonVectorizedSMeMLoad(const T *__restrict__ A,
         const int current_A_row =
             (blockIdx.x * M_chunk_size) + current_thread_row_in_A;
         const int current_A_col = chunk_idx * N_chunk_size + thread_col_in_A;
-        const int A_index = current_A_row * N + current_A_col;
         if (current_A_row < M && current_A_col < N) {
-            A_chunk[thread_col_in_A][current_thread_row_in_A] = A[A_index];
+            A_chunk[thread_col_in_A][current_thread_row_in_A] =
+                A->get({current_A_row, current_A_col});
         } else {
             A_chunk[thread_col_in_A][current_thread_row_in_A] = 0;
         }
@@ -40,9 +42,9 @@ __device__ void NonVectorizedSMeMLoad(const T *__restrict__ A,
         const int current_B_row =
             chunk_idx * N_chunk_size + current_thread_row_in_B;
         const int current_B_col = (blockIdx.y * K_chunk_size) + thread_col_in_B;
-        const int B_index = current_B_row * K + current_B_col;
         if (current_B_row < N && current_B_col < K) {
-            B_chunk[current_thread_row_in_B][thread_col_in_B] = B[B_index];
+            B_chunk[current_thread_row_in_B][thread_col_in_B] =
+                B->get({current_B_row, current_B_col});
         } else {
             B_chunk[current_thread_row_in_B][thread_col_in_B] = 0;
         }
@@ -51,8 +53,8 @@ __device__ void NonVectorizedSMeMLoad(const T *__restrict__ A,
 
 template <typename T, const int M_chunk_size, const int N_chunk_size,
           const int K_chunk_size>
-__device__ void Float4VectorizedSMeMLoad(const T *__restrict__ A,
-                                         const T *__restrict__ B,
+__device__ void Float4VectorizedSMeMLoad(const Tensor<T> *__restrict__ A,
+                                         const Tensor<T> *__restrict__ B,
                                          T A_chunk[][M_chunk_size + 1],
                                          T B_chunk[][K_chunk_size + 1],
                                          const int chunk_idx, const int M,
@@ -76,7 +78,10 @@ __device__ void Float4VectorizedSMeMLoad(const T *__restrict__ A,
             chunk_idx * N_chunk_size + thread_col_in_A * 4;
         const int A_index = current_A_row * N + current_A_col;
 
-        const float4 A_load = reinterpret_cast<const float4 *>(&A[A_index])[0];
+        // const float4 A_load = reinterpret_cast<const float4
+        // *>(&A[A_index])[0];
+        const float4 A_load = reinterpret_cast<const float4 *>(
+            &A->get({current_A_row, current_A_col}))[0];
         A_chunk[thread_col_in_A * 4 + 0][current_thread_row_in_A] = A_load.x;
         A_chunk[thread_col_in_A * 4 + 1][current_thread_row_in_A] = A_load.y;
         A_chunk[thread_col_in_A * 4 + 2][current_thread_row_in_A] = A_load.z;
@@ -92,7 +97,10 @@ __device__ void Float4VectorizedSMeMLoad(const T *__restrict__ A,
             (blockIdx.y * K_chunk_size) + thread_col_in_B * 4;
         const int B_index = current_B_row * K + current_B_col;
 
-        const float4 B_load = reinterpret_cast<const float4 *>(&B[B_index])[0];
+        // const float4 B_load = reinterpret_cast<const float4
+        // *>(&B[B_index])[0];
+        const float4 B_load = reinterpret_cast<const float4 *>(
+            &B->get({current_B_row, current_B_col}))[0];
         B_chunk[current_thread_row_in_B][thread_col_in_B * 4 + 0] = B_load.x;
         B_chunk[current_thread_row_in_B][thread_col_in_B * 4 + 1] = B_load.y;
         B_chunk[current_thread_row_in_B][thread_col_in_B * 4 + 2] = B_load.z;
